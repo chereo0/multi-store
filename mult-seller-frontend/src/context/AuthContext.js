@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { registerUser } from '../api/services';
+import { registerUser, loginUser } from '../api/services';
 
 const AuthContext = createContext();
 
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = (userDataOrEmail, password) => {
+  const login = async (userDataOrEmail, password) => {
     try {
       // If userDataOrEmail is an object, it's user data from OTP verification
       if (typeof userDataOrEmail === 'object') {
@@ -34,19 +34,38 @@ export const AuthProvider = ({ children }) => {
         return { success: true };
       }
       
-      // Otherwise, it's email/password login (placeholder for now)
-      const userData = {
-        id: 1,
-        email: userDataOrEmail,
-        name: 'John Doe',
-        avatar: 'https://via.placeholder.com/40'
-      };
+      // Otherwise, it's email/password login - use actual API
+      const result = await loginUser(userDataOrEmail, password);
       
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      return { success: true };
+      if (result.success) {
+        // Extract user data from API response
+        const userData = {
+          id: result.user?.id || result.data?.user?.id || result.data?.id,
+          email: userDataOrEmail,
+          name: result.user?.name || result.data?.user?.name || `${result.user?.firstname || result.data?.user?.firstname || ''} ${result.user?.lastname || result.data?.user?.lastname || ''}`.trim() || 'User',
+          firstname: result.user?.firstname || result.data?.user?.firstname,
+          lastname: result.user?.lastname || result.data?.user?.lastname,
+          username: result.user?.username || result.data?.user?.username,
+          telephone: result.user?.telephone || result.data?.user?.telephone,
+          avatar: result.user?.avatar || result.data?.user?.avatar || 'https://via.placeholder.com/40',
+          token: result.token || result.data?.token || result.access_token || result.data?.access_token
+        };
+        
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Store auth token if provided
+        if (userData.token) {
+          localStorage.setItem('auth_token', userData.token);
+        }
+        
+        return { success: true };
+      } else {
+        return { success: false, error: result.message || 'Login failed' };
+      }
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('Login error:', error);
+      return { success: false, error: error.message || 'An error occurred during login' };
     }
   };
 

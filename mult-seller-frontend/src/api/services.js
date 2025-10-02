@@ -403,3 +403,84 @@ export const fetchAndStoreClientToken = async () => {
   }
   return data;
 };
+
+// Login API function
+export const loginUser = async (email, password) => {
+  try {
+    // Get client credentials token first
+    let token = localStorage.getItem('client_token');
+    
+    // If no token or token might be expired, get a new one
+    if (!token) {
+      token = await getClientToken();
+      if (!token) {
+        return { success: false, message: 'Failed to authenticate with server. Please try again.' };
+      }
+    }
+
+    // Prepare login payload
+    const payload = {
+      email: email,
+      password: password
+    };
+
+    // Use the actual login API endpoint with authorization
+    const response = await fetch('https://multi-store-api.cloudgoup.com/api/rest/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    
+    // If unauthorized, try to get a new token and retry once
+    if (response.status === 401) {
+      console.log('Token expired, getting new token...');
+      token = await getClientToken();
+      if (token) {
+        const retryResponse = await fetch('https://multi-store-api.cloudgoup.com/api/rest/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        
+        const retryData = await retryResponse.json();
+        
+        if (retryResponse.ok) {
+          // Handle both success: 1 and success: true patterns
+          if (retryData.success === 1 || retryData.success === true) {
+            return { success: true, ...retryData };
+          } else {
+            return { success: false, message: retryData.message || 'Login failed', errors: retryData.errors };
+          }
+        } else {
+          return { success: false, message: retryData.message || 'Login failed', errors: retryData.errors };
+        }
+      } else {
+        return { success: false, message: 'Authentication failed. Please try again.' };
+      }
+    }
+    
+    if (response.ok) {
+      // Handle both success: 1 and success: true patterns
+      if (data.success === 1 || data.success === true) {
+        return { success: true, ...data };
+      } else {
+        return { success: false, message: data.message || 'Login failed', errors: data.errors };
+      }
+    } else {
+      return { success: false, message: data.message || 'Login failed', errors: data.errors };
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    return { success: false, message: 'Network error. Please try again.' };
+  }
+};
