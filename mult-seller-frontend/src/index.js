@@ -4,6 +4,21 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Prevent auth from being cleared by early API 401/403 responses during a hard page refresh.
+// Some components (and axios) may make requests before AuthContext finishes restoring tokens.
+// Set a short-lived flag so the response interceptor can detect a refresh and avoid clearing auth.
+try {
+  sessionStorage.setItem('is_refreshing', 'true');
+  // Remove the flag shortly after mount to resume normal error handling
+  setTimeout(() => {
+    sessionStorage.removeItem('is_refreshing');
+  }, 5000);
+} catch (e) {
+  // sessionStorage might be unavailable in some environments; ignore any errors
+  // eslint-disable-next-line no-console
+  console.warn('Could not set is_refreshing flag in sessionStorage', e);
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>

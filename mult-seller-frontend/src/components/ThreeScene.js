@@ -1,221 +1,219 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
+import React, { useState, useEffect } from 'react';
 
-// Enhanced floating geometric shapes component
-function FloatingShape({ position, color, shape = 'box', isActive = false, index = 0 }) {
-  const meshRef = useRef();
-  const [hovered, setHovered] = useState(false);
-  
-  useFrame((state) => {
-    if (meshRef.current) {
-      const speed = isActive ? 3 : 0.8;
-      const amplitude = isActive ? 1.5 : 0.7;
-      const time = state.clock.elapsedTime;
-      const offset = index * 0.5; // Stagger animations
-      
-      // More complex rotation patterns
-      meshRef.current.rotation.x = Math.sin(time * speed + offset) * 0.4 + Math.cos(time * speed * 0.3) * 0.2;
-      meshRef.current.rotation.y = Math.sin(time * speed * 0.7 + offset) * 0.6 + Math.cos(time * speed * 0.2) * 0.3;
-      meshRef.current.rotation.z = Math.sin(time * speed * 0.4 + offset) * 0.3;
-      
-      // Enhanced floating motion
-      meshRef.current.position.y = position[1] + 
-        Math.sin(time * speed * 0.8 + offset) * amplitude +
-        Math.cos(time * speed * 0.3 + offset) * (amplitude * 0.5);
-      
-      meshRef.current.position.x = position[0] + 
-        Math.sin(time * speed * 0.2 + offset) * 0.3;
-      
-      meshRef.current.position.z = position[2] + 
-        Math.cos(time * speed * 0.15 + offset) * 0.2;
-      
-      // Dynamic scaling with interaction
-      const baseScale = isActive ? 1.2 : 0.8;
-      const pulseScale = Math.sin(time * (isActive ? 4 : 2) + offset) * 0.3;
-      const hoverScale = hovered ? 0.2 : 0;
-      meshRef.current.scale.setScalar(baseScale + pulseScale + hoverScale);
-    }
-  });
-
-  const geometry = useMemo(() => {
-    switch (shape) {
-      case 'sphere':
-        return new THREE.SphereGeometry(0.8, 32, 32);
-      case 'torus':
-        return new THREE.TorusGeometry(0.6, 0.3, 16, 32);
-      case 'octahedron':
-        return new THREE.OctahedronGeometry(0.7, 2);
-      case 'dodecahedron':
-        return new THREE.DodecahedronGeometry(0.7, 2);
-      case 'icosahedron':
-        return new THREE.IcosahedronGeometry(0.7, 1);
-      case 'tetrahedron':
-        return new THREE.TetrahedronGeometry(0.8, 0);
-      default:
-        return new THREE.BoxGeometry(1, 1, 1, 2, 2, 2);
-    }
-  }, [shape]);
-
-  return (
-    <mesh 
-      ref={meshRef} 
-      position={position}
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
-    >
-      <primitive object={geometry} />
-      <meshStandardMaterial 
-        color={color} 
-        transparent 
-        opacity={isActive ? 0.9 : 0.7}
-        roughness={isActive ? 0.1 : 0.4}
-        metalness={isActive ? 0.9 : 0.6}
-        emissive={isActive ? color : '#000000'}
-        emissiveIntensity={isActive ? 0.4 : 0.1}
-        wireframe={hovered}
-      />
-    </mesh>
-  );
-}
-
-// Enhanced animated background particles with colors
-function Particles({ count = 150, formInteraction = 0 }) {
-  const points = useRef();
-  
-  const { particlesPosition, particleColors } = useMemo(() => {
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const colorPalette = [
-      [0.231, 0.510, 0.965],  // Primary Blue #3B82F6
-      [0.961, 0.620, 0.043],  // Secondary Amber #F59E0B
-      [0.067, 0.094, 0.153],  // Dark Text #111827
-      [0.420, 0.447, 0.502],  // Muted Text #6B7280
-      [0.976, 0.980, 0.984],  // Background #F9FAFB
-      [0.145, 0.400, 0.800],  // Darker Blue variant
-    ];
-    
-    for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 25;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 25;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 25;
-      
-      const colorIndex = Math.floor(Math.random() * colorPalette.length);
-      const color = colorPalette[colorIndex];
-      colors[i * 3] = color[0];
-      colors[i * 3 + 1] = color[1];
-      colors[i * 3 + 2] = color[2];
-    }
-    return { particlesPosition: positions, particleColors: colors };
-  }, [count]);
-
-  useFrame((state) => {
-    if (points.current) {
-      const time = state.clock.elapsedTime;
-      const interactionSpeed = 0.1 + formInteraction * 0.05;
-      
-      points.current.rotation.y = time * interactionSpeed;
-      points.current.rotation.x = time * (interactionSpeed * 0.5);
-      points.current.rotation.z = Math.sin(time * 0.1) * 0.1;
-      
-      // Pulsing effect based on interaction
-      const scale = 1 + Math.sin(time * 2) * 0.1 + formInteraction * 0.05;
-      points.current.scale.setScalar(scale);
-    }
-  });
-
-  return (
-    <points ref={points}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={count}
-          array={particlesPosition}
-          itemSize={3}
-        />
-        <bufferAttribute
-          attach="attributes-color"
-          count={count}
-          array={particleColors}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial 
-        size={0.08 + formInteraction * 0.02} 
-        transparent 
-        opacity={0.8} 
-        vertexColors
-        sizeAttenuation
-      />
-    </points>
-  );
-}
-
-// Enhanced 3D Scene component with more shapes and effects
-function Scene3D({ formInteraction = 0 }) {
-  const [activeShapes, setActiveShapes] = useState(new Set());
-  
-  useEffect(() => {
-    // More dynamic shape activation based on form interaction
-    const shapes = [0, 1, 2, 3, 4, 5, 6, 7];
-    const numActive = Math.min(Math.floor(formInteraction / 1.5) + 2, shapes.length);
-    const shuffled = shapes.sort(() => 0.5 - Math.random());
-    setActiveShapes(new Set(shuffled.slice(0, numActive)));
-  }, [formInteraction]);
-
-  return (
-    <>
-      {/* Enhanced Dynamic Lighting with new color palette */}
-      <ambientLight intensity={0.4 + formInteraction * 0.15} color="#F9FAFB" />
-      <directionalLight 
-        position={[10, 10, 5]} 
-        intensity={0.8 + formInteraction * 0.3} 
-        color="#F59E0B" 
-        castShadow
-      />
-      <pointLight 
-        position={[-10, -10, -5]} 
-        color="#3B82F6" 
-        intensity={0.6 + formInteraction * 0.2} 
-      />
-      <pointLight 
-        position={[5, -5, 3]} 
-        color="#F59E0B" 
-        intensity={0.4 + formInteraction * 0.15} 
-      />
-      <pointLight 
-        position={[-5, 5, -3]} 
-        color="#3B82F6" 
-        intensity={0.5 + formInteraction * 0.1} 
-      />
-      
-      {/* Enhanced floating shapes with new color palette */}
-      <FloatingShape position={[-3, 2, -2]} color="#3B82F6" shape="dodecahedron" isActive={activeShapes.has(0)} index={0} />
-      <FloatingShape position={[3, -1, -3]} color="#F59E0B" shape="icosahedron" isActive={activeShapes.has(1)} index={1} />
-      <FloatingShape position={[-2, -2, -1]} color="#3B82F6" shape="torus" isActive={activeShapes.has(2)} index={2} />
-      <FloatingShape position={[2, 3, -4]} color="#F59E0B" shape="octahedron" isActive={activeShapes.has(3)} index={3} />
-      <FloatingShape position={[0, 0, -5]} color="#3B82F6" shape="tetrahedron" isActive={activeShapes.has(4)} index={4} />
-      <FloatingShape position={[-4, 0, -3]} color="#F59E0B" shape="sphere" isActive={activeShapes.has(5)} index={5} />
-      <FloatingShape position={[4, 1, -2]} color="#3B82F6" shape="box" isActive={activeShapes.has(6)} index={6} />
-      <FloatingShape position={[0, -3, -4]} color="#F59E0B" shape="dodecahedron" isActive={activeShapes.has(7)} index={7} />
-      
-      {/* Enhanced background particles */}
-      <Particles count={80 + formInteraction * 15} formInteraction={formInteraction} />
-    </>
-  );
-}
-
-// Main component that renders the Canvas
+// Simple CSS-based animated background replacement
 export default function ThreeScene({ formInteraction = 0 }) {
+  const [stars, setStars] = useState([]);
+
+  useEffect(() => {
+    // Generate random stars for the background
+    const generateStars = () => {
+      const newStars = [];
+      for (let i = 0; i < 100; i++) {
+        newStars.push({
+          id: i,
+          x: Math.random() * 100,
+          y: Math.random() * 100,
+          size: Math.random() * 3 + 1,
+          opacity: Math.random() * 0.8 + 0.2,
+          animationDelay: Math.random() * 3,
+          animationDuration: Math.random() * 4 + 2
+        });
+      }
+      setStars(newStars);
+    };
+
+    generateStars();
+  }, []);
+
   return (
-    <div className="absolute inset-0 -z-10">
-      <Canvas
-        camera={{ position: [0, 0, 8], fov: 75 }}
-        style={{ background: 'transparent' }}
-        performance={{ min: 0.5 }}
-      >
-        <Scene3D formInteraction={formInteraction} />
-      </Canvas>
+    <div className="absolute inset-0 -z-10 overflow-hidden">
+      {/* Animated gradient background */}
+      <div 
+        className="absolute inset-0 opacity-30"
+        style={{
+          background: `linear-gradient(45deg, 
+            rgba(0, 229, 255, 0.1) 0%, 
+            rgba(255, 0, 255, 0.1) 25%, 
+            rgba(0, 229, 255, 0.05) 50%, 
+            rgba(255, 0, 255, 0.1) 75%, 
+            rgba(0, 229, 255, 0.1) 100%)`,
+          animation: 'gradientShift 8s ease-in-out infinite'
+        }}
+      />
+      
+      {/* Floating geometric shapes */}
+      <div className="absolute inset-0">
+        {/* Floating circles */}
+        <div 
+          className="absolute w-4 h-4 rounded-full opacity-20"
+          style={{
+            background: 'linear-gradient(45deg, #00E5FF, #FF00FF)',
+            left: '20%',
+            top: '30%',
+            animation: `float 6s ease-in-out infinite, pulse 3s ease-in-out infinite`,
+            animationDelay: '0s'
+          }}
+        />
+        <div 
+          className="absolute w-6 h-6 rounded-full opacity-15"
+          style={{
+            background: 'linear-gradient(45deg, #FF00FF, #00E5FF)',
+            right: '25%',
+            top: '60%',
+            animation: `float 8s ease-in-out infinite, pulse 4s ease-in-out infinite`,
+            animationDelay: '2s'
+          }}
+        />
+        <div 
+          className="absolute w-3 h-3 rounded-full opacity-25"
+          style={{
+            background: 'linear-gradient(45deg, #00E5FF, #FF00FF)',
+            left: '70%',
+            top: '20%',
+            animation: `float 7s ease-in-out infinite, pulse 2.5s ease-in-out infinite`,
+            animationDelay: '1s'
+          }}
+        />
+        
+        {/* Floating squares */}
+        <div 
+          className="absolute w-5 h-5 opacity-20"
+          style={{
+            background: 'linear-gradient(45deg, #FF00FF, #00E5FF)',
+            left: '15%',
+            top: '70%',
+            transform: 'rotate(45deg)',
+            animation: `float 9s ease-in-out infinite, rotate 10s linear infinite`,
+            animationDelay: '3s'
+          }}
+        />
+        <div 
+          className="absolute w-4 h-4 opacity-15"
+          style={{
+            background: 'linear-gradient(45deg, #00E5FF, #FF00FF)',
+            right: '15%',
+            top: '40%',
+            transform: 'rotate(45deg)',
+            animation: `float 5s ease-in-out infinite, rotate 8s linear infinite`,
+            animationDelay: '1.5s'
+          }}
+        />
+      </div>
+
+      {/* Animated stars */}
+      <div className="absolute inset-0">
+        {stars.map((star) => (
+          <div
+            key={star.id}
+            className="absolute rounded-full bg-white"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+              animation: `twinkle ${star.animationDuration}s ease-in-out infinite`,
+              animationDelay: `${star.animationDelay}s`
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Interactive elements based on form interaction */}
+      {formInteraction > 0 && (
+        <div className="absolute inset-0">
+          {/* Pulsing rings */}
+          <div 
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+            style={{
+              width: `${100 + formInteraction * 20}px`,
+              height: `${100 + formInteraction * 20}px`,
+              border: '2px solid rgba(0, 229, 255, 0.3)',
+              borderRadius: '50%',
+              animation: 'pulse 2s ease-in-out infinite'
+            }}
+          />
+          <div 
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+            style={{
+              width: `${150 + formInteraction * 30}px`,
+              height: `${150 + formInteraction * 30}px`,
+              border: '1px solid rgba(255, 0, 255, 0.2)',
+              borderRadius: '50%',
+              animation: 'pulse 3s ease-in-out infinite',
+              animationDelay: '1s'
+            }}
+          />
+        </div>
+      )}
+
+      {/* CSS Animations */}
+      <style jsx>{`
+        @keyframes gradientShift {
+          0%, 100% { 
+            background: linear-gradient(45deg, 
+              rgba(0, 229, 255, 0.1) 0%, 
+              rgba(255, 0, 255, 0.1) 25%, 
+              rgba(0, 229, 255, 0.05) 50%, 
+              rgba(255, 0, 255, 0.1) 75%, 
+              rgba(0, 229, 255, 0.1) 100%);
+          }
+          50% { 
+            background: linear-gradient(45deg, 
+              rgba(255, 0, 255, 0.1) 0%, 
+              rgba(0, 229, 255, 0.1) 25%, 
+              rgba(255, 0, 255, 0.05) 50%, 
+              rgba(0, 229, 255, 0.1) 75%, 
+              rgba(255, 0, 255, 0.1) 100%);
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% { 
+            transform: translateY(0px) translateX(0px); 
+          }
+          25% { 
+            transform: translateY(-20px) translateX(10px); 
+          }
+          50% { 
+            transform: translateY(-10px) translateX(-5px); 
+          }
+          75% { 
+            transform: translateY(-30px) translateX(15px); 
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { 
+            transform: scale(1); 
+            opacity: 0.2; 
+          }
+          50% { 
+            transform: scale(1.2); 
+            opacity: 0.4; 
+          }
+        }
+        
+        @keyframes twinkle {
+          0%, 100% { 
+            opacity: 0.2; 
+            transform: scale(1); 
+          }
+          50% { 
+            opacity: 1; 
+            transform: scale(1.2); 
+          }
+        }
+        
+        @keyframes rotate {
+          from { 
+            transform: rotate(0deg); 
+          }
+          to { 
+            transform: rotate(360deg); 
+          }
+        }
+      `}</style>
     </div>
   );
 }

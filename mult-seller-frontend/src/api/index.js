@@ -1,7 +1,7 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// Resolve base URL to work smoothly with XAMPP (Apache on localhost)
+// Resolve base URL for live server
 const resolveBaseURL = () => {
   // 1) Prefer explicit env var
   const envUrl = process.env.REACT_APP_API_URL;
@@ -9,15 +9,8 @@ const resolveBaseURL = () => {
     return envUrl.replace(/\/$/, '');
   }
 
-  // 2) Infer same-host XAMPP default like http://localhost/api
-  try {
-    const protocol = typeof window !== 'undefined' && window.location?.protocol ? window.location.protocol : 'http:';
-    const host = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : 'localhost';
-    return `${protocol}//${host}/api`;
-  } catch (_e) {
-    // 3) Fallback
-    return 'http://localhost/api';
-  }
+  // 2) Use live server URL as default
+  return 'https://multi-store-api.cloudgoup.com/api/rest';
 };
 
 // Create axios instance with default configuration
@@ -37,17 +30,49 @@ const api = axios.create({
 // Request interceptor - runs before each request
 api.interceptors.request.use(
   (config) => {
-    // Get token from localStorage (if available)
-    const token = localStorage.getItem('auth_token');
+    // Get token from localStorage or sessionStorage (if available)
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
     const clientToken = localStorage.getItem('client_token');
     const urlString = typeof config.url === 'string' ? config.url : '';
     const isTokenRequest = urlString.includes('/oauth2/token');
     
     // Add authorization header if token exists
     if (!isTokenRequest && token) {
+      const tokenInfo = getTokenInfo(token);
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('API Request: Using auth_token for', config.url);
+      console.log('Token details:', {
+        ...tokenInfo,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (!tokenInfo.valid) {
+        console.warn('API Request: Invalid token format detected!', tokenInfo);
+      }
+      
+      if (tokenInfo.expired) {
+        console.warn('API Request: Token appears to be expired!', {
+          exp: tokenInfo.exp,
+          current: Date.now() / 1000,
+          expired: tokenInfo.expired
+        });
+      }
     } else if (!isTokenRequest && clientToken) {
+      const clientTokenInfo = getTokenInfo(clientToken);
       config.headers.Authorization = `Bearer ${clientToken}`;
+      console.log('API Request: Using client_token for', config.url);
+      console.log('Client token details:', {
+        ...clientTokenInfo,
+        timestamp: new Date().toISOString()
+      });
+    } else if (!isTokenRequest) {
+      console.warn('API Request: No token available for', config.url);
+      console.log('Storage check:', {
+        localStorageAuth: !!localStorage.getItem('auth_token'),
+        sessionStorageAuth: !!sessionStorage.getItem('auth_token'),
+        localStorageClient: !!localStorage.getItem('client_token'),
+        timestamp: new Date().toISOString()
+      });
     }
     
     // Log request in development
@@ -57,6 +82,8 @@ api.interceptors.request.use(
         url: config.url,
         data: config.data,
         headers: config.headers,
+        hasAuthToken: !!token,
+        hasClientToken: !!clientToken,
       });
     }
     
@@ -71,6 +98,8 @@ api.interceptors.request.use(
 // Response interceptor - runs after each response
 api.interceptors.response.use(
   (response) => {
+    // Reset any auth failure counter on successful responses
+    try { sessionStorage.removeItem('auth_failure_count'); } catch (e) {}
     // Log response in development
     if (process.env.NODE_ENV === 'development') {
       console.log('API Response:', {
@@ -89,18 +118,84 @@ api.interceptors.response.use(
       const { status, data } = error.response;
       
       // Handle specific HTTP status codes
+      // Use a tolerant refresh strategy to avoid clearing auth on transient 401/403 during page reloads.
+      // Track a short-lived refresh counter in sessionStorage. Only clear auth if we exceed a threshold
+      // of consecutive auth failures, or if not currently in a refresh scenario.
+      const refreshFlag = sessionStorage.getItem('is_refreshing') === 'true';
+      const refreshCountKey = 'auth_failure_count';
+      const maxFailuresBeforeClear = 2; // allow up to this many consecutive failures during refresh
+
+      const incrementFailureCount = () => {
+        try {
+          const raw = sessionStorage.getItem(refreshCountKey) || '0';
+          const count = parseInt(raw, 10) || 0;
+          sessionStorage.setItem(refreshCountKey, String(count + 1));
+        } catch (e) {
+          // ignore storage errors
+        }
+      };
+
+      const resetFailureCount = () => {
+        try { sessionStorage.removeItem(refreshCountKey); } catch (e) {}
+      };
+
       switch (status) {
         case 401:
-          // Unauthorized - clear token and redirect to login
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
-          toast.error('Session expired. Please login again.');
-          // You can add redirect logic here if needed
+          // Unauthorized
+          if (refreshFlag) {
+            console.log('401 received during app refresh - incrementing failure counter');
+            incrementFailureCount();
+            const current = parseInt(sessionStorage.getItem(refreshCountKey) || '0', 10) || 0;
+            if (current > maxFailuresBeforeClear) {
+              console.log('Auth failures exceeded threshold during refresh - clearing auth');
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('user');
+              toast.error('Session expired. Please login again.');
+              resetFailureCount();
+            } else {
+              console.log('Deferring auth clear until refresh completes. Failure count:', current);
+            }
+          } else {
+            // Not a refresh scenario - clear auth immediately
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            toast.error('Session expired. Please login again.');
+          }
           break;
           
         case 403:
-          // Forbidden
-          toast.error('Access denied. You don\'t have permission to perform this action.');
+          // Forbidden - check if it's due to missing auth token
+          console.log('403 Forbidden error:', data);
+          console.log('403 Request details:', {
+            url: error.config?.url,
+            method: error.config?.method,
+            headers: error.config?.headers,
+            timestamp: new Date().toISOString()
+          });
+          
+          if (data.error && Array.isArray(data.error) && data.error.includes('User is not logged in')) {
+            console.log('403 due to "User is not logged in" - token may be expired or invalid');
+
+            if (refreshFlag) {
+              console.log('403 during refresh - incrementing failure counter');
+              incrementFailureCount();
+              const current = parseInt(sessionStorage.getItem(refreshCountKey) || '0', 10) || 0;
+              if (current > maxFailuresBeforeClear) {
+                console.log('Auth failures exceeded threshold during refresh - clearing auth');
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('user');
+                toast.error('Authentication issue detected. Please log in again.');
+                resetFailureCount();
+              } else {
+                console.log('Deferring auth clear until refresh completes. Failure count:', current);
+                toast.error('Authentication issue detected. Please refresh the page or log in again.');
+              }
+            } else {
+              toast.error('Authentication issue detected. Please refresh the page or log in again.');
+            }
+          } else {
+            toast.error('Access denied. You don\'t have permission to perform this action.');
+          }
           break;
           
         case 404:
@@ -245,6 +340,60 @@ export const clearAuthToken = () => {
  */
 export const getAuthToken = () => {
   return localStorage.getItem('auth_token');
+};
+
+/**
+ * Validate if token appears to be a valid format
+ * @param {string} token - Token to validate
+ * @returns {boolean} True if token appears valid
+ */
+export const isValidTokenFormat = (token) => {
+  if (!token || typeof token !== 'string') return false;
+  
+  // Basic validation - token should be at least 20 characters
+  if (token.length < 20) return false;
+  
+  // Check if it looks like a JWT (has dots) or access token (hex-like)
+  const isJWT = token.includes('.') && token.split('.').length === 3;
+  const isAccessToken = /^[a-f0-9]+$/i.test(token);
+  
+  return isJWT || isAccessToken;
+};
+
+/**
+ * Get token info for debugging
+ * @param {string} token - Token to analyze
+ * @returns {object} Token information
+ */
+export const getTokenInfo = (token) => {
+  if (!token) return { valid: false, type: 'none', length: 0 };
+  
+  const info = {
+    valid: isValidTokenFormat(token),
+    type: 'unknown',
+    length: token.length,
+    start: token.substring(0, 10),
+    end: token.substring(token.length - 10)
+  };
+  
+  if (token.includes('.')) {
+    info.type = 'JWT';
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        info.exp = payload.exp;
+        info.iat = payload.iat;
+        info.expired = payload.exp ? Date.now() / 1000 > payload.exp : false;
+      }
+    } catch (e) {
+      info.type = 'JWT (malformed)';
+    }
+  } else if (/^[a-f0-9]+$/i.test(token)) {
+    info.type = 'Access Token';
+  }
+  
+  return info;
 };
 
 // Export the configured axios instance

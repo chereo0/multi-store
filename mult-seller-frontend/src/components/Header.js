@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useTheme } from '../context/ThemeContext';
+import ThemeToggle from './ThemeToggle';
 
 const Header = () => {
   const { user, logout } = useAuth();
   const { getCartItemsCount } = useCart();
+  const { isDarkMode, colors } = useTheme();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -17,15 +20,18 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white shadow-lg border-b border-gray-100" style={{ backgroundColor: '#F9FAFB' }}>
+    <header className={`${colors[isDarkMode ? 'dark' : 'light'].headerBg} backdrop-blur-md shadow-sm border-b transition-colors duration-300 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4">
+        <div className="flex justify-between items-center h-16">
           <Link 
             to="/home" 
-            className="text-2xl font-bold transition-colors duration-300 hover:opacity-80"
-            style={{ color: '#111827' }}
+            className="flex items-center transition-colors duration-300 hover:opacity-80"
           >
-            Multi-Seller
+            <img
+              src="/logo.svg"
+              alt="Multi-Seller Logo"
+              className="h-8 w-auto"
+            />
           </Link>
           
           <nav className="flex items-center space-x-6">
@@ -45,8 +51,7 @@ const Header = () => {
                   <>
                     <Link
                       to="/login"
-                      className="font-medium transition-colors duration-300 hover:opacity-80"
-                      style={{ color: '#6B7280' }}
+                      className={`font-medium transition-colors duration-300 hover:opacity-80 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}
                     >
                       Login
                     </Link>
@@ -68,8 +73,7 @@ const Header = () => {
                         console.log('Profile button clicked, current state:', showProfileMenu);
                         setShowProfileMenu(!showProfileMenu);
                       }}
-                      className="flex items-center space-x-3 px-4 py-2 rounded-xl transition-all duration-300 hover:shadow-lg"
-                      style={{ backgroundColor: 'white', border: '2px solid #3B82F6' }}
+                      className={`flex items-center space-x-3 px-4 py-2 rounded-xl transition-all duration-300 hover:shadow-lg ${colors[isDarkMode ? 'dark' : 'light'].cardBg} border-2 border-blue-500`}
                     >
                       <img
                         src={user.avatar || 'https://via.placeholder.com/40'}
@@ -77,16 +81,15 @@ const Header = () => {
                         className="w-8 h-8 rounded-full object-cover"
                       />
                       <div className="text-left">
-                        <div className="font-semibold text-sm" style={{ color: '#111827' }}>
+                        <div className={`font-semibold text-sm ${colors[isDarkMode ? 'dark' : 'light'].text}`}>
                           {user.name || `${user.firstname} ${user.lastname}`}
                         </div>
-                        <div className="text-xs" style={{ color: '#6B7280' }}>
+                        <div className={`text-xs ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
                           {user.email}
                         </div>
                       </div>
                       <svg 
-                        className={`w-4 h-4 transition-transform duration-300 ${showProfileMenu ? 'rotate-180' : ''}`}
-                        style={{ color: '#3B82F6' }}
+                        className={`w-4 h-4 transition-transform duration-300 ${showProfileMenu ? 'rotate-180' : ''} text-blue-500`}
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -98,10 +101,10 @@ const Header = () => {
                     {/* Dropdown Menu */}
                     {showProfileMenu && (
                       <div 
-                        className="absolute right-0 mt-2 w-64 rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
-                        style={{ backgroundColor: 'white', zIndex: 60 }}
+                        className={`absolute right-0 mt-2 w-64 rounded-xl shadow-2xl border overflow-hidden ${colors[isDarkMode ? 'dark' : 'light'].cardBg} ${colors[isDarkMode ? 'dark' : 'light'].cardBorder}`}
+                        style={{ zIndex: 60 }}
                       >
-                        <div className="p-4 border-b border-gray-100">
+                        <div className={`p-4 border-b ${colors[isDarkMode ? 'dark' : 'light'].cardBorder}`}>
                           <div className="flex items-center space-x-3">
                             <img
                               src={user.avatar || 'https://via.placeholder.com/50'}
@@ -109,17 +112,17 @@ const Header = () => {
                               className="w-12 h-12 rounded-full object-cover"
                             />
                             <div>
-                              <div className="font-semibold" style={{ color: '#111827' }}>
+                              <div className={`font-semibold ${colors[isDarkMode ? 'dark' : 'light'].text}`}>
                                 {user.name || `${user.firstname} ${user.lastname}`}
                               </div>
-                              <div className="text-sm" style={{ color: '#6B7280' }}>
+                              <div className={`text-sm ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
                                 @{user.username}
                               </div>
-                              <div className="text-xs" style={{ color: '#6B7280' }}>
+                              <div className={`text-xs ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
                                 {user.email}
                               </div>
                               {user.telephone && (
-                                <div className="text-xs" style={{ color: '#6B7280' }}>
+                                <div className={`text-xs ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
                                   📞 {user.telephone}
                                 </div>
                               )}
@@ -135,7 +138,7 @@ const Header = () => {
                               console.log('Main logout button clicked');
                               handleLogout();
                             }}
-                            className="w-full text-left px-4 py-3 rounded-lg transition-colors duration-300 hover:bg-red-50 flex items-center space-x-2"
+                            className={`w-full text-left px-4 py-3 rounded-lg transition-colors duration-300 hover:bg-red-50 flex items-center space-x-2 ${colors[isDarkMode ? 'dark' : 'light'].text}`}
                             style={{ color: '#DC2626' }}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,13 +152,15 @@ const Header = () => {
                     )}
                   </div>
                 )}
+                
+                {/* Theme Toggle */}
+                <ThemeToggle />
               </div>
             ) : (
               <div className="flex items-center space-x-4">
                 <Link
                   to="/login"
-                  className="font-medium transition-colors duration-300 hover:opacity-80"
-                  style={{ color: '#6B7280' }}
+                  className={`font-medium transition-colors duration-300 hover:opacity-80 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}
                 >
                   Login
                 </Link>
@@ -173,6 +178,9 @@ const Header = () => {
                 >
                   🛒 Cart ({getCartItemsCount()})
                 </Link>
+                
+                {/* Theme Toggle */}
+                <ThemeToggle />
               </div>
             )}
           </nav>

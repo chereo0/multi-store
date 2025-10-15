@@ -101,7 +101,7 @@ const VerifyOTP = () => {
       
       // If no token, get a new one
       if (!token) {
-        const { getClientToken } = await import('../api/services');
+        const { getClientToken } = await import('../../api/services');
         token = await getClientToken();
         if (!token) {
           setError('Authentication failed. Please try again.');
@@ -140,10 +140,16 @@ const VerifyOTP = () => {
         
         localStorage.setItem('user', JSON.stringify(userInfo));
         if (data.token || data.data?.token) {
-          localStorage.setItem('token', data.token || data.data.token);
+          const token = data.token || data.data.token;
+          localStorage.setItem('auth_token', token);
+          console.log('VerifyOTP: Stored auth token:', token);
         }
         
-        // Login user
+        // Login user with token
+        const token = data.token || data.data?.token;
+        if (token) {
+          userInfo.token = token;
+        }
         login(userInfo);
         
         // Navigate to homepage
@@ -151,7 +157,7 @@ const VerifyOTP = () => {
       } else {
         // Handle 401 unauthorized - try to get new token and retry once
         if (response.status === 401) {
-          const { getClientToken } = await import('../api/services');
+          const { getClientToken } = await import('../../api/services');
           const newToken = await getClientToken();
           if (newToken) {
             // Retry the request with new token
@@ -185,7 +191,9 @@ const VerifyOTP = () => {
               
               localStorage.setItem('user', JSON.stringify(userInfo));
               if (retryData.token || retryData.data?.token) {
-                localStorage.setItem('token', retryData.token || retryData.data.token);
+                const token = retryData.token || retryData.data.token;
+                localStorage.setItem('auth_token', token);
+                console.log('VerifyOTP (retry): Stored auth token:', token);
               }
               
               login(userInfo);
@@ -220,7 +228,7 @@ const VerifyOTP = () => {
       
       // If no token, get a new one
       if (!token) {
-        const { getClientToken } = await import('../api/services');
+        const { getClientToken } = await import('../../api/services');
         token = await getClientToken();
         if (!token) {
           setError('Authentication failed. Please try again.');
