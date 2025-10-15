@@ -6,6 +6,7 @@ import { getProfile, updateProfile } from "../api/services";
 
 const ProfilePage = () => {
   const { user } = useAuth();
+  const { updateUser } = useAuth();
   const { isDarkMode } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -14,13 +15,12 @@ const ProfilePage = () => {
     email: user?.email || "",
     telephone: user?.telephone || "",
   });
-  const [loading, setLoading] = useState(false);
+  // loading state is not needed here (profile uses saving state)
 
   useEffect(() => {
     const loadProfile = async () => {
       // Wait for auth to initialize
       try {
-        setLoading(true);
         const result = await getProfile();
         if (result.success && result.data) {
           const p = result.data;
@@ -39,12 +39,12 @@ const ProfilePage = () => {
         console.error("Profile load error:", error);
         toast.error("Network error while loading profile");
       } finally {
-        setLoading(false);
+        // no-op
       }
     };
 
     loadProfile();
-  }, []);
+  }, [user]);
 
   const handleInputChange = (e) => {
     setProfileData({
@@ -60,30 +60,21 @@ const ProfilePage = () => {
       setSaving(true);
       console.log("Saving profile:", profileData);
       const result = await updateProfile(profileData);
-      if (result.success) {
-        toast.success("Profile updated");
-        // If backend returned updated user data, persist it to localStorage
-        const returned = result.data?.data || result.data || null;
-        if (returned) {
-          try {
-            // Merge returned fields into stored user
-            const existingUserRaw = localStorage.getItem("user");
-            const existingUser = existingUserRaw
-              ? JSON.parse(existingUserRaw)
-              : {};
-            const merged = { ...existingUser, ...returned };
-            localStorage.setItem("user", JSON.stringify(merged));
-          } catch (e) {
-            console.warn(
-              "Could not update localStorage user after profile update",
-              e
-            );
+        if (result.success) {
+          toast.success("Profile updated");
+          // If backend returned updated user data, propagate into AuthContext
+          const returned = result.data?.data || result.data || null;
+          if (returned) {
+            try {
+              updateUser(returned);
+            } catch (e) {
+              console.warn('ProfilePage: failed to propagate update to AuthContext', e);
+            }
           }
+          setIsEditing(false);
+        } else {
+          toast.error(result.message || "Failed to update profile");
         }
-        setIsEditing(false);
-      } else {
-        toast.error(result.message || "Failed to update profile");
-      }
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Network error while updating profile");

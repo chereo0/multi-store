@@ -339,6 +339,20 @@ export const AuthProvider = ({ children }) => {
     clearAuthToken();
   };
 
+  // Update user in-memory and persist to storage
+  const updateUser = (updates = {}) => {
+    setUser((prev) => {
+      const next = { ...(prev || {}), ...(updates || {}) };
+      try {
+        localStorage.setItem('user', JSON.stringify(next));
+        sessionStorage.setItem('user', JSON.stringify(next));
+      } catch (e) {
+        console.warn('AuthContext: failed to persist user update', e);
+      }
+      return next;
+    });
+  };
+
   const value = {
     user,
     isGuest,
@@ -346,6 +360,7 @@ export const AuthProvider = ({ children }) => {
     signup,
     logout,
     continueAsGuest,
+    updateUser,
     loading,
     tokenValid,
     validateToken
