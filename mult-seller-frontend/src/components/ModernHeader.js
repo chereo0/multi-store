@@ -66,8 +66,8 @@ const Header = () => {
 
   return (
     <>
-      {/* Fixed Navigation Bar */}
-      <header className="fixed top-0 left-0 right-0 bg-white shadow-sm border-b border-gray-200 z-50">
+  {/* Fixed Navigation Bar */}
+  <header ref={headerRef} className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#071026] border-b border-gray-800 shadow-2xl' : 'bg-white shadow-sm border-b border-gray-200'}`}>
         <div className="px-8 lg:px-16 h-20 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-3">
@@ -137,16 +137,19 @@ const Header = () => {
               </svg>
             </button>
 
-            {/* Theme toggle */}
+            {/* Theme toggle (icon shows current mode) */}
             <button
               onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
               aria-label="Toggle theme"
-              className="ml-2 p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+              aria-pressed={theme === 'dark'}
+              className={`ml-2 p-2 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-white text-gray-800 hover:bg-gray-100'}`}
             >
               {theme === 'dark' ? (
-                <svg className="w-5 h-5 text-yellow-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.1a1 1 0 0 1 0 2 7 7 0 1 0 7 7 1 1 0 1 1 2 0A9 9 0 1 1 12 3.1z"/></svg>
+                // Moon icon (dark mode active)
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>
               ) : (
-                <svg className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="currentColor"><path d="M6.76 4.84l-1.8-1.79L3.17 5.84l1.79 1.79 1.8-1.79zM1 13h3v-2H1v2zm10 8h2v-3h-2v3zm7.04-2.16l1.79 1.79 1.79-1.79-1.79-1.79-1.79 1.79zM20 11h3v-2h-3v2zM4.22 19.78l1.79-1.79L4.22 16.2 2.43 18l1.79 1.78zM12 6a6 6 0 100 12A6 6 0 0012 6z"/></svg>
+                // Sun icon (light mode active)
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
               )}
             </button>
           </div>
