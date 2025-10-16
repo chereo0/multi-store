@@ -1,5 +1,4 @@
 import React, { useRef, useEffect } from 'react';
-import { gsap } from 'gsap';
 
 // Lightweight particle system using canvas; GSAP drives the particle movement for smoothness
 const ParticleField = ({ density = 120 }) => {
@@ -11,8 +10,13 @@ const ParticleField = ({ density = 120 }) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    let width = (canvas.width = canvas.clientWidth = window.innerWidth);
-    let height = (canvas.height = canvas.clientHeight = Math.max(window.innerHeight * 0.5, 400));
+  // Determine size using layout size (client bounding rect). Do NOT assign to clientWidth (read-only).
+  const rect = canvas.getBoundingClientRect();
+  let width = Math.max(rect.width || 0, window.innerWidth);
+  let height = Math.max(rect.height || 0, Math.max(window.innerHeight * 0.5, 400));
+  // Set canvas drawing buffer size
+  canvas.width = Math.round(width);
+  canvas.height = Math.round(height);
 
     let particles = [];
 
@@ -69,8 +73,11 @@ const ParticleField = ({ density = 120 }) => {
     tick();
 
     const onResize = () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = Math.max(window.innerHeight * 0.5, 400);
+      const r = canvas.getBoundingClientRect();
+      width = Math.max(r.width || 0, window.innerWidth);
+      height = Math.max(r.height || 0, Math.max(window.innerHeight * 0.5, 400));
+      canvas.width = Math.round(width);
+      canvas.height = Math.round(height);
       createParticles(density);
     };
     window.addEventListener('resize', onResize);
