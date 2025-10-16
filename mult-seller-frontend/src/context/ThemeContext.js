@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext();
 
@@ -16,6 +16,15 @@ export const ThemeProvider = ({ children }) => {
   const toggleTheme = () => {
     setIsDarkMode(prev => !prev);
   };
+
+  // Apply theme classes to document root so CSS and non-context consumers can react
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.classList.toggle('theme-dark', isDarkMode);
+    document.documentElement.classList.toggle('theme-light', !isDarkMode);
+    // smooth transition for colors
+    document.documentElement.style.transition = 'background-color 400ms, color 400ms';
+  }, [isDarkMode]);
 
   const theme = {
     isDarkMode,

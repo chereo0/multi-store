@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import ParticleField from './ParticleField';
@@ -7,7 +8,6 @@ gsap.registerPlugin(ScrollTrigger);
 
 const AboutHero = () => {
   const containerRef = useRef(null);
-  const [isDark, setIsDark] = useState(() => typeof document !== 'undefined' && document.documentElement.classList.contains('theme-dark'));
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -21,17 +21,7 @@ const AboutHero = () => {
       });
     }, containerRef);
 
-    // Watch for theme class changes on root so background image can update
-    const root = document.documentElement;
-    const mo = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.attributeName === 'class') {
-          const dark = root.classList.contains('theme-dark');
-          setIsDark(dark);
-        }
-      }
-    });
-    mo.observe(root, { attributes: true, attributeFilter: ['class'] });
+    // Theme is provided by ThemeContext; no need for MutationObserver
 
     return () => ctx.revert();
   }, []);
@@ -40,7 +30,7 @@ const AboutHero = () => {
     <section
       ref={containerRef}
       className="relative overflow-hidden"
-      style={isDark ? { backgroundImage: "url('/About%20Dark.png')", backgroundSize: 'cover', backgroundPosition: 'center' } : { backgroundImage: "url('/About.png')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+      style={{ backgroundSize: 'cover', backgroundPosition: 'center', backgroundImage: `url('${useTheme().isDarkMode ? '/About Dark.png' : '/About.png'}')` }}
     >
       <ParticleField />
       <div className="relative z-10 max-w-6xl mx-auto px-6 py-28 text-center">

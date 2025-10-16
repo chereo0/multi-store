@@ -23,12 +23,7 @@ const Header = () => {
     navigate('/home');
   };
 
-  useEffect(() => {
-    // Theme toggle applies classes to root element
-    document.documentElement.classList.toggle('theme-dark', theme === 'dark');
-    document.documentElement.classList.toggle('theme-light', theme === 'light');
-    document.documentElement.style.transition = 'background-color 500ms, color 500ms';
-  }, [theme]);
+  // Theme is managed by ThemeContext now; keep header visuals local only
 
   // GSAP: Header slide down on load and hide/show on scroll
   useEffect(() => {
