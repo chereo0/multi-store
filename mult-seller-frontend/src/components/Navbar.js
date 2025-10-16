@@ -29,7 +29,8 @@ const Navbar = () => {
   };
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-md transition-all duration-300 ${
+    // Make navbar static in the document flow so it appears consistently on all pages
+    <nav className={`relative w-full backdrop-blur-md transition-all duration-300 ${
       isDarkMode 
         ? 'bg-gray-900/80 border-b border-cyan-400/20' 
         : 'bg-white/95 border-b border-gray-200'
