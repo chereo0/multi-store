@@ -172,16 +172,6 @@ const StoresPage = () => {
               }`}>
                 Experience the ultimate shopping destination with cutting-edge products and exceptional service
               </p>
-              <Link
-                to="/store/phoenix"
-                className={`inline-block px-8 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
-                  isDarkMode 
-                    ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25' 
-                    : 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg'
-                }`}
-              >
-                Visit Phoenix Emporium
-              </Link>
             </div>
           </div>
         </div>

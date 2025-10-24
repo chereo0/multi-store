@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -51,7 +51,7 @@ const AuthPage = () => {
   const [mounted, setMounted] = useState(false);
 
   const { login, signup, continueAsGuest } = useAuth();
-  const { isDarkMode, colors } = useTheme();
+  const { isDarkMode } = useTheme();
 
   const navigate = useNavigate();
 
@@ -232,91 +232,6 @@ const AuthPage = () => {
         backgroundColor: isDarkMode ? "#0A0E27" : "#f8fafc",
       }}
     >
-      {/* Navigation Bar */}
-
-      <div className="absolute top-0 left-0 right-0 z-50">
-        <div
-          className={`w-full h-[80px] flex items-center justify-between px-12 transition-colors duration-300 ${
-            isDarkMode
-              ? "bg-gray-900/80 backdrop-blur-md border-b border-gray-700"
-              : "bg-white/95 backdrop-blur-md border-b border-gray-200"
-          }`}
-          style={{
-            boxShadow: isDarkMode
-              ? "0 4px 20px rgba(0, 0, 0, 0.3)"
-              : "0 4px 20px rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          {/* Logo Section */}
-
-          <div className="flex items-center">
-            <Link to="/home" className="flex items-center space-x-3">
-              <div
-                className="w-11 h-11 rounded-full flex items-center justify-center"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #00E5FF 0%, #FF00FF 100%)",
-
-                  boxShadow: "0 0 20px rgba(0, 229, 255, 0.5)",
-                }}
-              >
-                <span className="text-white font-bold text-lg">M</span>
-              </div>
-
-              <span
-                className={`font-bold text-xl tracking-wider transition-colors duration-300 ${
-                  colors[isDarkMode ? "dark" : "light"].text
-                }`}
-                style={{ letterSpacing: "0.02em" }}
-              >
-                MULTIVERSE MARKET
-              </span>
-            </Link>
-          </div>
-
-          {/* Navigation Links */}
-
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link
-              to="/home"
-              className="text-sm font-medium text-[#B0B8C1] hover:text-[#00E5FF] transition-colors duration-200"
-            >
-              Explore
-            </Link>
-
-            <Link
-              to="/categories"
-              className="text-sm font-medium text-[#B0B8C1] hover:text-[#00E5FF] transition-colors duration-200"
-            >
-              Collections
-            </Link>
-
-            <Link
-              to="/stores"
-              className="text-sm font-medium text-[#B0B8C1] hover:text-[#00E5FF] transition-colors duration-200"
-            >
-              Merchants
-            </Link>
-          </nav>
-
-          {/* Back to Home Button */}
-
-          <Link
-            to="/home"
-            className="px-6 py-2 rounded-full text-sm font-semibold text-white transition-all duration-300 hover:scale-105"
-            style={{
-              background: "transparent",
-
-              border: "2px solid #00E5FF",
-
-              boxShadow: "0 0 20px rgba(0, 229, 255, 0.3)",
-            }}
-          >
-            Back to Home
-          </Link>
-        </div>
-      </div>
-
       {/* 3D Animated Background */}
 
       <ThreeScene formInteraction={formInteraction} />

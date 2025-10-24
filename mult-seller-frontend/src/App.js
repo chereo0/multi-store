@@ -1,28 +1,34 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { CartProvider } from './context/CartContext';
-import { ToastProvider } from './context/ToastContext';
-import { ThemeProvider } from './context/ThemeContext';
-import { Toaster } from 'react-hot-toast';
-import Navbar from './components/Navbar';
+import React, { useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
+import { ToastProvider } from "./context/ToastContext";
+import { ThemeProvider } from "./context/ThemeContext";
+import { Toaster } from "react-hot-toast";
+import Navbar from "./components/Navbar";
 
 // Pages
-import Homepage from './pages/home/Homepage';
-import CategoryPage from './pages/CategoryPage';
-import Login from './pages/auth/Login';
-import Signup from './pages/auth/Signup';
-import AuthPage from './pages/auth/AuthPage';
-import VerifyOTP from './pages/auth/VerifyOTP';
-import StorePage from './pages/store/StorePage';
-import PhoenixEmporium from './pages/store/PhoenixEmporium';
-import CartPage from './pages/cart/CartPage';
-import ProductPage from './pages/product/ProductPage';
-import AboutPage from './pages/AboutPage';
-import StoresPage from './pages/StoresPage';
-import ContactPage from './pages/ContactPage';
-import ProfilePage from './pages/ProfilePage';
-import AddressPage from './pages/AddressPage';
+import Homepage from "./pages/home/Homepage";
+import CategoryPage from "./pages/CategoryPage";
+import Login from "./pages/auth/Login";
+import Signup from "./pages/auth/Signup";
+import AuthPage from "./pages/auth/AuthPage";
+import VerifyOTP from "./pages/auth/VerifyOTP";
+import StorePage from "./pages/store/StorePage";
+import PhoenixEmporium from "./pages/store/PhoenixEmporium";
+import CartPage from "./pages/cart/CartPage";
+import ProductPage from "./pages/product/ProductPage";
+import AboutPage from "./pages/AboutPage";
+import StoresPage from "./pages/StoresPage";
+import ContactPage from "./pages/ContactPage";
+import ProfilePage from "./pages/ProfilePage";
+import AddressPage from "./pages/AddressPage";
 
 const AnimatedRoutes = () => {
   const location = useLocation();
@@ -56,13 +62,13 @@ function App() {
     // Initialize client token on app start
     (async () => {
       try {
-        const mod = await import('./api/services');
-        if (typeof mod.getClientToken === 'function') {
+        const mod = await import("./api/services");
+        if (typeof mod.getClientToken === "function") {
           await mod.getClientToken();
-          console.log('Client token initialized');
+          console.log("Client token initialized");
         }
       } catch (error) {
-        console.error('Failed to initialize client token:', error);
+        console.error("Failed to initialize client token:", error);
       }
     })();
   }, []);
@@ -76,7 +82,10 @@ function App() {
               <div className="App">
                 <Navbar />
                 <AnimatedRoutes />
-                <Toaster position="top-right" toastOptions={{ duration: 2000 }} />
+                <Toaster
+                  position="top-right"
+                  toastOptions={{ duration: 2000 }}
+                />
               </div>
             </Router>
           </ToastProvider>
