@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import toast from "react-hot-toast";
-import { getProfile, updateProfile } from "../api/services";
+import { getProfile, updateProfile, updatePassword } from "../api/services";
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -55,26 +55,35 @@ const ProfilePage = () => {
 
   const [saving, setSaving] = useState(false);
 
+  // Change password state
+  const [pwOld, setPwOld] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
   const handleSave = async () => {
     try {
       setSaving(true);
       console.log("Saving profile:", profileData);
       const result = await updateProfile(profileData);
-        if (result.success) {
-          toast.success("Profile updated");
-          // If backend returned updated user data, propagate into AuthContext
-          const returned = result.data?.data || result.data || null;
-          if (returned) {
-            try {
-              updateUser(returned);
-            } catch (e) {
-              console.warn('ProfilePage: failed to propagate update to AuthContext', e);
-            }
+      if (result.success) {
+        toast.success("Profile updated");
+        // If backend returned updated user data, propagate into AuthContext
+        const returned = result.data?.data || result.data || null;
+        if (returned) {
+          try {
+            updateUser(returned);
+          } catch (e) {
+            console.warn(
+              "ProfilePage: failed to propagate update to AuthContext",
+              e
+            );
           }
-          setIsEditing(false);
-        } else {
-          toast.error(result.message || "Failed to update profile");
         }
+        setIsEditing(false);
+      } else {
+        toast.error(result.message || "Failed to update profile");
+      }
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Network error while updating profile");
@@ -92,6 +101,46 @@ const ProfilePage = () => {
       telephone: user?.telephone || "",
     });
     setIsEditing(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (!pwOld || !pwNew || !pwConfirm) {
+      toast.error("Please fill all password fields");
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      toast.error("New password and confirmation do not match");
+      return;
+    }
+    // Basic length check
+    if (pwNew.length < 8) {
+      toast.error("New password must be at least 8 characters");
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const payload = {
+        old_password: pwOld,
+        new_password: pwNew,
+        confirm: pwConfirm,
+      };
+      const result = await updatePassword(payload);
+      if (result.success) {
+        toast.success("Password changed successfully");
+        // Clear fields
+        setPwOld("");
+        setPwNew("");
+        setPwConfirm("");
+      } else {
+        toast.error(result.message || "Failed to change password");
+      }
+    } catch (error) {
+      console.error("Password change error:", error);
+      toast.error("Network error while changing password");
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   return (
@@ -323,6 +372,105 @@ const ProfilePage = () => {
                 </button>
               </>
             )}
+          </div>
+
+          {/* Change Password Section */}
+          <div className="mt-10 border-t pt-8">
+            <h3
+              className={`text-xl font-semibold mb-4 transition-colors duration-300 ${{
+                true: isDarkMode ? "text-white" : "text-gray-900",
+              }[true]}`}
+            >
+              Change Password
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-1">
+                <label
+                  htmlFor="old_password"
+                  className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  Current Password
+                </label>
+                <input
+                  id="old_password"
+                  name="old_password"
+                  type="password"
+                  value={pwOld}
+                  onChange={(e) => setPwOld(e.target.value)}
+                  className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
+                    isDarkMode
+                      ? "bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-cyan-400/20"
+                      : "bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500/20"
+                  } focus:outline-none focus:ring-2`}
+                  placeholder="Current password"
+                />
+              </div>
+
+              <div className="md:col-span-1">
+                <label
+                  htmlFor="new_password"
+                  className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  New Password
+                </label>
+                <input
+                  id="new_password"
+                  name="new_password"
+                  type="password"
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
+                    isDarkMode
+                      ? "bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-cyan-400/20"
+                      : "bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500/20"
+                  } focus:outline-none focus:ring-2`}
+                  placeholder="New password (min 8 chars)"
+                />
+              </div>
+
+              <div className="md:col-span-1">
+                <label
+                  htmlFor="confirm_password"
+                  className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  Confirm Password
+                </label>
+                <input
+                  id="confirm_password"
+                  name="confirm"
+                  type="password"
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
+                    isDarkMode
+                      ? "bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-cyan-400/20"
+                      : "bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500/20"
+                  } focus:outline-none focus:ring-2`}
+                  placeholder="Confirm new password"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={handleChangePassword}
+                disabled={changingPassword}
+                className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isDarkMode
+                    ? "bg-gradient-to-r from-indigo-500 to-pink-500 text-white shadow-lg shadow-pink-500/20"
+                    : "bg-gradient-to-r from-indigo-600 to-pink-600 text-white shadow-lg"
+                }`}
+              >
+                {changingPassword ? "Changing..." : "Change Password"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

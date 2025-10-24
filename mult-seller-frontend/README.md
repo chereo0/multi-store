@@ -5,6 +5,7 @@ This repository contains the frontend for the Quantum Multiverse multi-seller st
 This README covers: quick setup, development commands (PowerShell-ready), theme handling, About page specifics (GSAP and particles), troubleshooting, and contribution notes.
 
 ## Table of contents
+
 - Requirements
 - Quick start (PowerShell)
 - Development workflow
@@ -18,6 +19,7 @@ This README covers: quick setup, development commands (PowerShell-ready), theme 
 ---
 
 ## Requirements
+
 - Node.js 18+ (LTS recommended)
 - npm (bundled with Node) or yarn
 - Windows PowerShell (instructions use PowerShell-friendly commands)
@@ -59,6 +61,7 @@ The About page (`src/pages/AboutPage.js`) is a visually-rich, GSAP-animated page
 If you plan to modify the hero's background assets, place them in `public/` and update the filenames used in `AboutHero.js`.
 
 ### Known caveats
+
 - The particle canvas relies on its container having a non-zero layout size. If the hero appears collapsed, verify parent CSS provides height (or supply an explicit height).
 - On mobile and low-powered devices you may want to reduce particle density (the `density` prop in `ParticleField` controls this).
 
@@ -97,6 +100,7 @@ If you need premium GSAP plugins (SplitText, etc.) you will need a Club GreenSoc
 4. Commit and open a PR with a descriptive title.
 
 Coding guidelines
+
 - Follow existing project conventions — Tailwind utility classes and React functional components.
 - Keep animations using transform/opacity where possible.
 
@@ -126,6 +130,7 @@ If you'd like, I can:
 - Move theme toggle into a single shared header and remove any ad-hoc toggles.
 
 Tell me what to do next and I’ll make the change.
+
 # Multi-Seller Frontend
 
 A React-based e-commerce platform that allows users to browse multiple stores, view products, manage cart, and place orders.
@@ -133,16 +138,19 @@ A React-based e-commerce platform that allows users to browse multiple stores, v
 ## Features
 
 ### 🔐 Authentication
+
 - **Sign Up**: Create new user accounts with full name, email, phone, and address
 - **Login**: Secure user authentication
 - **Guest Mode**: Browse and shop without creating an account
 
 ### 🏠 Homepage
+
 - **Categories**: Browse products by category (Electronics, Fashion, Home & Garden, etc.)
 - **Featured Stores**: View all available stores with ratings and verification status
 - **Store Navigation**: Click on any store to view its products and details
 
 ### 🏪 Store Pages
+
 - **Store Information**: View store banner, logo, description, and ratings
 - **Product Catalog**: Browse all products from a specific store
 - **Product Details**: View product images, descriptions, prices, and ratings
@@ -151,6 +159,7 @@ A React-based e-commerce platform that allows users to browse multiple stores, v
 - **Product Reviews**: Read and write reviews for individual products
 
 ### 🛒 Cart & Checkout
+
 - **Shopping Cart**: View all selected products organized by store
 - **Quantity Management**: Increase/decrease product quantities
 - **Remove Items**: Remove products from cart
@@ -163,6 +172,7 @@ A React-based e-commerce platform that allows users to browse multiple stores, v
 - **Order Confirmation**: Receive order confirmation with estimated delivery
 
 ### ⭐ Reviews & Ratings
+
 - **Store Ratings**: Rate stores from 1-5 stars
 - **Product Ratings**: Rate individual products
 - **Public Reviews**: All reviews are visible to other users
@@ -206,23 +216,27 @@ src/
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js (v14 or higher)
 - npm or yarn
 
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd mult-seller-frontend
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Start the development server**
+
    ```bash
    npm start
    ```
@@ -264,14 +278,15 @@ To connect with your Laravel backend:
 4. Implement real user authentication flow
 
 Example API call:
+
 ```javascript
 export const getStores = async () => {
   try {
-    const response = await fetch('/api/stores', {
+    const response = await fetch("/api/stores", {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
     });
     const data = await response.json();
     return { success: true, data };
@@ -284,22 +299,26 @@ export const getStores = async () => {
 ## Features Implementation
 
 ### Authentication Flow
+
 - Users can sign up with detailed information
 - Login/logout functionality with persistent sessions
 - Guest users can browse but need to login for reviews and checkout
 
 ### Shopping Cart
+
 - Add/remove products with quantity management
 - Cart persists across browser sessions
 - Items are organized by store for better UX
 
 ### Reviews System
+
 - Star-based rating system (1-5 stars)
 - Text reviews with user information
 - Separate reviews for stores and products
 - Authentication required for submitting reviews
 
 ### Responsive Design
+
 - Mobile-first approach with Tailwind CSS
 - Responsive grid layouts
 - Touch-friendly interface elements

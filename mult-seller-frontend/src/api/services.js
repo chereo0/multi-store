@@ -894,6 +894,69 @@ export const updateProfile = async (payload) => {
   }
 };
 
+// Change user password
+export const updatePassword = async (payload) => {
+  try {
+    // Expecting payload: { old_password, new_password, confirm }
+    const response = await api.put("/account/password", payload);
+    if (response.status >= 200 && response.status < 300) {
+      return { success: true, data: response.data };
+    }
+    return {
+      success: false,
+      message: response.data?.message || "Failed to change password",
+    };
+  } catch (error) {
+    if (error.response) {
+      return {
+        success: false,
+        message:
+          error.response.data?.message ||
+          `Failed to change password (${error.response.status})`,
+        errors: error.response.data?.errors,
+      };
+    }
+    return { success: false, message: "Network error. Please try again." };
+  }
+};
+
+// Get homepage builder data
+export const getHomePageBuilder = async () => {
+  try {
+    // Check if we have client token, if not get one
+    let clientToken = localStorage.getItem("client_token");
+    if (!clientToken) {
+      console.log("No client token found, fetching...");
+      await fetchAndStoreClientToken();
+      clientToken = localStorage.getItem("client_token");
+    }
+
+    const response = await api.get("/home_page_builder");
+    const data = response.data;
+    
+    console.log("Homepage builder raw response:", data);
+    
+    if (data && (data.success === 1 || data.success === true)) {
+      return { success: true, data: data.data || data };
+    }
+    return { success: true, data: data };
+  } catch (error) {
+    console.error("Error fetching homepage builder:", error);
+    if (error.response) {
+      console.error("Error response:", error.response.data);
+      console.error("Error status:", error.response.status);
+      return {
+        success: false,
+        message:
+          error.response.data?.message ||
+          `Failed to fetch homepage data (${error.response.status})`,
+        errors: error.response.data?.errors,
+      };
+    }
+    return { success: false, message: "Network error. Please try again." };
+  }
+};
+
 // Delete address by ID
 export const deleteAddress = async (addressId) => {
   try {

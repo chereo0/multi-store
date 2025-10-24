@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
-import Logo from './Logo';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
+import Logo from "./Logo";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -14,13 +14,13 @@ const Header = () => {
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState("dark");
   const headerRef = useRef(null);
 
   const handleLogout = () => {
     logout();
     setShowProfileMenu(false);
-    navigate('/home');
+    navigate("/home");
   };
 
   // Theme is managed by ThemeContext now; keep header visuals local only
@@ -32,7 +32,7 @@ const Header = () => {
     gsap.fromTo(
       el,
       { y: -80, autoAlpha: 0 },
-      { y: 0, autoAlpha: 1, duration: 0.8, ease: 'power3.out' }
+      { y: 0, autoAlpha: 1, duration: 0.8, ease: "power3.out" }
     );
 
     let lastScroll = 0;
@@ -40,29 +40,36 @@ const Header = () => {
       const current = window.pageYOffset || document.documentElement.scrollTop;
       if (current > lastScroll && current > 100) {
         // scrolling down -> hide
-        gsap.to(el, { y: -90, autoAlpha: 0, duration: 0.4, ease: 'power2.in' });
+        gsap.to(el, { y: -90, autoAlpha: 0, duration: 0.4, ease: "power2.in" });
       } else {
         // scrolling up -> show
-        gsap.to(el, { y: 0, autoAlpha: 1, duration: 0.4, ease: 'power2.out' });
+        gsap.to(el, { y: 0, autoAlpha: 1, duration: 0.4, ease: "power2.out" });
       }
       lastScroll = current <= 0 ? 0 : current;
     };
 
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const navigationLinks = [
-    { name: 'Home', href: '/home' },
-    { name: 'Snoes', href: '/categories' },
-    { name: 'Hont', href: '/stores' },
-    { name: 'Aclumt', href: '/about' },
+    { name: "Home", href: "/home" },
+    { name: "Snoes", href: "/categories" },
+    { name: "Hont", href: "/stores" },
+    { name: "Aclumt", href: "/about" },
   ];
 
   return (
     <>
-  {/* Fixed Navigation Bar */}
-  <header ref={headerRef} className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${theme === 'dark' ? 'bg-[#071026] border-b border-gray-800 shadow-2xl' : 'bg-white shadow-sm border-b border-gray-200'}`}>
+      {/* Fixed Navigation Bar */}
+      <header
+        ref={headerRef}
+        className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-300 ${
+          theme === "dark"
+            ? "bg-[#071026] border-b border-gray-800 shadow-2xl"
+            : "bg-white shadow-sm border-b border-gray-200"
+        }`}
+      >
         <div className="px-8 lg:px-16 h-20 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-3">
@@ -97,7 +104,9 @@ const Header = () => {
             {/* Auth Buttons */}
             {user && !user.isGuest ? (
               <div className="flex items-center space-x-3">
-                <span className="text-sm text-gray-700">Hello, {user.name}</span>
+                <span className="text-sm text-gray-700">
+                  Hello, {user.name}
+                </span>
                 <button
                   onClick={handleLogout}
                   className="text-sm text-gray-600 hover:text-cyan-500 transition-colors duration-200"
@@ -127,24 +136,59 @@ const Header = () => {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="md:hidden p-2 rounded-lg text-gray-700 hover:text-cyan-500 transition-colors duration-200"
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
 
             {/* Theme toggle (icon shows current mode) */}
             <button
-              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
               aria-label="Toggle theme"
-              aria-pressed={theme === 'dark'}
-              className={`ml-2 p-2 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-white text-gray-800 hover:bg-gray-100'}`}
+              aria-pressed={theme === "dark"}
+              className={`ml-2 p-2 rounded-full transition-colors duration-200 ${
+                theme === "dark"
+                  ? "bg-gray-800 text-white hover:bg-gray-700"
+                  : "bg-white text-gray-800 hover:bg-gray-100"
+              }`}
             >
-              {theme === 'dark' ? (
+              {theme === "dark" ? (
                 // Moon icon (dark mode active)
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                </svg>
               ) : (
                 // Sun icon (light mode active)
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                <svg
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                </svg>
               )}
             </button>
           </div>
