@@ -377,9 +377,11 @@ const ProfilePage = () => {
           {/* Change Password Section */}
           <div className="mt-10 border-t pt-8">
             <h3
-              className={`text-xl font-semibold mb-4 transition-colors duration-300 ${{
-                true: isDarkMode ? "text-white" : "text-gray-900",
-              }[true]}`}
+              className={`text-xl font-semibold mb-4 transition-colors duration-300 ${
+                {
+                  true: isDarkMode ? "text-white" : "text-gray-900",
+                }[true]
+              }`}
             >
               Change Password
             </h3>

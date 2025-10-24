@@ -75,12 +75,19 @@ const Homepage = () => {
             );
             console.log("New arrival data found:", newArrivalData);
             if (newArrivalData) {
-              const products = newArrivalData.products || newArrivalData.stores || newArrivalData.items || [];
+              const products =
+                newArrivalData.products ||
+                newArrivalData.stores ||
+                newArrivalData.items ||
+                [];
               setNewArrivals(products);
               console.log("New arrivals extracted:", products);
               // Log the full first item to see its structure
               if (products.length > 0) {
-                console.log("FULL first item object:", JSON.stringify(products[0], null, 2));
+                console.log(
+                  "FULL first item object:",
+                  JSON.stringify(products[0], null, 2)
+                );
                 console.log("First item keys:", Object.keys(products[0]));
               }
             }
@@ -299,9 +306,12 @@ const Homepage = () => {
                 {categories.map((category, index) => {
                   const glowColor = index % 2 === 0 ? "#00E5FF" : "#FF00FF";
                   const categoryIcon = getCategoryIcon(category.name);
-                  
+
                   return (
-                    <div key={category.category_id || index} className="relative group cursor-pointer">
+                    <div
+                      key={category.category_id || index}
+                      className="relative group cursor-pointer"
+                    >
                       <div
                         className={`relative p-8 rounded-2xl transition-all duration-500 group-hover:scale-105 ${
                           isDarkMode
@@ -362,10 +372,12 @@ const Homepage = () => {
 
                           <p
                             className={`mb-4 text-sm transition-colors duration-300 ${
-                              colors[isDarkMode ? "dark" : "light"].textSecondary
+                              colors[isDarkMode ? "dark" : "light"]
+                                .textSecondary
                             }`}
                           >
-                            {category.description || "Discover amazing products"}
+                            {category.description ||
+                              "Discover amazing products"}
                           </p>
 
                           <button
@@ -438,7 +450,7 @@ const Homepage = () => {
                         : "translate-y-10 opacity-0"
                     }`}
                   >
-                    <Link to={item.store_id ? `/store/${item.store_id}` : '#'}>
+                    <Link to={item.store_id ? `/store/${item.store_id}` : "#"}>
                       <div
                         className={`relative p-4 rounded-xl transition-all duration-300 hover:scale-105 group cursor-pointer ${
                           isDarkMode
@@ -457,36 +469,51 @@ const Homepage = () => {
                         {/* Item Image */}
                         <div
                           className="relative mb-4 overflow-hidden rounded-lg flex items-center justify-center p-4"
-                          style={{ 
+                          style={{
                             height: "200px",
-                            background: `linear-gradient(135deg, ${index % 2 === 0 ? "#00E5FF" : "#FF00FF"}20, ${index % 2 === 0 ? "#00E5FF" : "#FF00FF"}40)`
+                            background: `linear-gradient(135deg, ${
+                              index % 2 === 0 ? "#00E5FF" : "#FF00FF"
+                            }20, ${index % 2 === 0 ? "#00E5FF" : "#FF00FF"}40)`,
                           }}
                         >
-                          {(item.background_image || item.profile_image) ? (
+                          {item.background_image || item.profile_image ? (
                             <div className="w-full h-full flex items-center justify-center">
                               <img
-                                src={item.background_image || item.profile_image}
+                                src={
+                                  item.background_image || item.profile_image
+                                }
                                 alt={item.name || item.title}
                                 className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-300"
                                 onLoad={(e) => {
-                                  console.log('✅ Image loaded successfully!');
-                                  console.log('URL:', item.background_image || item.profile_image);
-                                  console.log('Store:', item.name);
+                                  console.log("✅ Image loaded successfully!");
+                                  console.log(
+                                    "URL:",
+                                    item.background_image || item.profile_image
+                                  );
+                                  console.log("Store:", item.name);
                                 }}
                                 onError={(e) => {
-                                  console.error('❌ Image load error!');
-                                  console.error('URL:', item.background_image || item.profile_image);
-                                  console.error('Store:', item.name);
-                                  e.target.style.display = 'none';
-                                  const fallback = document.createElement('div');
-                                  fallback.className = 'text-6xl';
-                                  fallback.textContent = item.store_id ? '🏪' : '📦';
+                                  console.error("❌ Image load error!");
+                                  console.error(
+                                    "URL:",
+                                    item.background_image || item.profile_image
+                                  );
+                                  console.error("Store:", item.name);
+                                  e.target.style.display = "none";
+                                  const fallback =
+                                    document.createElement("div");
+                                  fallback.className = "text-6xl";
+                                  fallback.textContent = item.store_id
+                                    ? "🏪"
+                                    : "📦";
                                   e.target.parentElement.appendChild(fallback);
                                 }}
                               />
                             </div>
                           ) : (
-                            <div className="text-6xl">{item.store_id ? '🏪' : '📦'}</div>
+                            <div className="text-6xl">
+                              {item.store_id ? "🏪" : "📦"}
+                            </div>
                           )}
                           {item.average_rating && (
                             <div
@@ -537,7 +564,8 @@ const Homepage = () => {
                               <span
                                 className="text-sm"
                                 style={{
-                                  color: index % 2 === 0 ? "#00E5FF" : "#FF00FF",
+                                  color:
+                                    index % 2 === 0 ? "#00E5FF" : "#FF00FF",
                                 }}
                               >
                                 {item.total_reviews} reviews
@@ -551,7 +579,9 @@ const Homepage = () => {
                             style={{
                               background: `linear-gradient(90deg, ${
                                 index % 2 === 0 ? "#00E5FF" : "#FF00FF"
-                              }20, ${index % 2 === 0 ? "#00E5FF" : "#FF00FF"}40)`,
+                              }20, ${
+                                index % 2 === 0 ? "#00E5FF" : "#FF00FF"
+                              }40)`,
                               border: `1px solid ${
                                 index % 2 === 0 ? "#00E5FF" : "#FF00FF"
                               }`,
@@ -561,7 +591,7 @@ const Homepage = () => {
                               }20`,
                             }}
                           >
-                            {item.store_id ? 'VISIT STORE' : 'VIEW PRODUCT'}
+                            {item.store_id ? "VISIT STORE" : "VIEW PRODUCT"}
                           </button>
                         </div>
                       </div>

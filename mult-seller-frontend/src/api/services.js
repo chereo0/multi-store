@@ -242,17 +242,53 @@ export const getStoresByCategory = async (categoryIdOrSlug) => {
 };
 
 export const getStore = async (storeId) => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const store = mockStores.find((s) => s.id === parseInt(storeId));
-  return { success: !!store, data: store };
+  // Try real API first
+  try {
+    const res = await api.get(`/store/${storeId}`);
+    // Accept different API shapes: { success: 1|true, data: {...} } or direct object
+    if (res && res.data) {
+      const payload = res.data;
+      const data = payload.data || payload;
+      const ok =
+        payload.success === 1 || payload.success === true || !!payload.data;
+      return { success: ok, data };
+    }
+    return { success: false, data: null };
+  } catch (error) {
+    console.warn(
+      "getStore API failed, falling back to mock data:",
+      error?.message || error
+    );
+    // Fallback to mock store for local dev
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const store = mockStores.find((s) => s.id === parseInt(storeId));
+    return { success: !!store, data: store };
+  }
 };
 
 export const getProducts = async (storeId) => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  const products = mockProducts[storeId] || [];
-  return { success: true, data: products };
+  // Try real API first
+  try {
+    const res = await api.get(`/store/${storeId}/products`);
+    if (res && res.data) {
+      const payload = res.data;
+      const data = payload.data || payload;
+      const ok =
+        payload.success === 1 ||
+        payload.success === true ||
+        Array.isArray(data);
+      return { success: ok, data };
+    }
+    return { success: false, data: [] };
+  } catch (error) {
+    console.warn(
+      "getProducts API failed, falling back to mock data:",
+      error?.message || error
+    );
+    // Fallback: return empty list (do not surface mock products in production)
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return { success: true, data: [] };
+  }
 };
 
 export const getProduct = async (productId) => {
@@ -267,10 +303,39 @@ export const getProduct = async (productId) => {
 };
 
 export const getStoreReviews = async (storeId) => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const reviews = mockReviews.stores[storeId] || [];
-  return { success: true, data: reviews };
+  // Some backends do not expose a GET /store/:id/reviews endpoint (405)
+  // and/or block cross-origin requests. To avoid noisy errors in the
+  // browser we first try to read reviews embedded in the store payload
+  // (GET /store/:id). If that does not contain reviews, we fallback to
+  // returning mock data without making another cross-origin request.
+  try {
+    const storeRes = await api.get(`/store/${storeId}`);
+    if (storeRes && storeRes.data) {
+      const payload = storeRes.data;
+      const storeData = payload.data || payload;
+      // Some APIs include reviews or items on the store object
+      if (Array.isArray(storeData.reviews) && storeData.reviews.length > 0) {
+        return { success: true, data: storeData.reviews };
+      }
+      if (Array.isArray(storeData.items) && storeData.items.length > 0) {
+        // If the API uses `items` for reviews (uncommon) return them
+        return { success: true, data: storeData.items };
+      }
+      // If store payload includes rating metadata but not a list, return empty
+      if (typeof storeData.total_reviews !== 'undefined') {
+        return { success: true, data: [] };
+      }
+    }
+  } catch (err) {
+    // Ignore - we'll fallback to mock data below
+    console.warn('getStoreReviews: could not read reviews from store payload:', err?.message || err);
+  }
+
+  // Avoid calling /store/:id/reviews directly to prevent 405/CORS noise.
+  // Return mock reviews for a clean UX.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  // Fallback: return empty list so the UI shows no reviews rather than mock data
+  return { success: true, data: [] };
 };
 
 export const getProductReviews = async (productId) => {
@@ -933,9 +998,9 @@ export const getHomePageBuilder = async () => {
 
     const response = await api.get("/home_page_builder");
     const data = response.data;
-    
+
     console.log("Homepage builder raw response:", data);
-    
+
     if (data && (data.success === 1 || data.success === true)) {
       return { success: true, data: data.data || data };
     }

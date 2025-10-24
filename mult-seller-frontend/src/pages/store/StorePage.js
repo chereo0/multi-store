@@ -52,9 +52,89 @@ const StorePage = () => {
           getProducts(storeId),
           getStoreReviews(storeId)
         ]);
-        if (storeResult.success) setStore(storeResult.data);
-        if (productsResult.success) setProducts(productsResult.data);
-        if (reviewsResult.success) setReviews(reviewsResult.data);
+
+        // Normalize store from direct API or from embedded store_info in the products response
+        if (storeResult && storeResult.success) {
+          setStore(storeResult.data || null);
+        }
+
+        // If the products endpoint embeds store_info, merge it into existing store state
+        const prodPayload = productsResult?.data;
+        const embedded = prodPayload?.data?.store_info || prodPayload?.store_info || prodPayload?.store || null;
+        if (embedded) {
+          const mapped = {
+            id: embedded.store_id || embedded.id,
+            name: embedded.name,
+            owner: embedded.owner || embedded.store_owner || '',
+            description: embedded.description || '',
+            logo: embedded.profile_image || embedded.logo,
+            banner: embedded.background_image || embedded.banner,
+            email: embedded.email || '',
+            telephone: embedded.telephone || embedded.phone || '',
+            address: embedded.address || '',
+            whatsapp: embedded.whatsapp || '',
+            facebook: embedded.facebook || '',
+            twitter: embedded.twitter || '',
+            instagram: embedded.instagram || '',
+            linkedin: embedded.linkedin || '',
+            youtube: embedded.youtube || '',
+            tiktok: embedded.tiktok || '',
+            product_limit: embedded.product_limit || embedded.productLimit || null,
+            opening_hours: embedded.opening_hours || embedded.opening_hours || null,
+            status: embedded.status,
+            date_added: embedded.date_added,
+            date_modified: embedded.date_modified,
+            average_rating: embedded.average_rating,
+            total_reviews: embedded.total_reviews
+          };
+          setStore((prev) => ({ ...(prev || {}), ...mapped }));
+        }
+
+        // Normalize products: backend may return various shapes. Handle the API shape you pasted:
+        // { success: 1, data: { store_info: {...}, new_products: [ { product_id, name, image, price }, ... ] } }
+        if (productsResult && productsResult.success) {
+          let p = productsResult.data;
+          // If payload is wrapper object, try to extract arrays
+          if (!Array.isArray(p)) {
+            // common fields: data, products, new_products, items
+            p = p?.data || p?.products || p?.new_products || p?.items || p;
+          }
+          // At this point p might still be an object (if we assigned prodPayload earlier), ensure array
+          if (!Array.isArray(p)) {
+            // If original data contained new_products nested under data, try that
+            const maybe = productsResult.data?.data?.new_products || productsResult.data?.new_products;
+            p = Array.isArray(maybe) ? maybe : [];
+          }
+
+          // Normalize product fields (server uses product_id)
+          const normalized = p.map((prod) => {
+            const rawPrice = prod.price || prod.price_text || prod.price_display || '';
+            const numeric = typeof rawPrice === 'string' ? parseFloat(rawPrice.replace(/[^0-9.]/g, '')) : rawPrice;
+            return {
+              id: prod.product_id || prod.id,
+              name: prod.name || prod.title || 'Product',
+              image: prod.image || prod.image_url || prod.picture || '/no-image.png',
+              price: Number.isFinite(numeric) ? numeric : null,
+              priceDisplay: rawPrice || (Number.isFinite(numeric) ? `$${numeric}` : null),
+              description: prod.description || prod.short_description || '' ,
+              inStock: prod.in_stock !== undefined ? !!prod.in_stock : true,
+            };
+          });
+          setProducts(normalized);
+        } else {
+          setProducts([]);
+        }
+
+        // Normalize reviews similarly
+        if (reviewsResult && reviewsResult.success) {
+          let r = reviewsResult.data;
+          if (!Array.isArray(r)) {
+            r = r?.data || r?.reviews || [];
+          }
+          setReviews(Array.isArray(r) ? r : []);
+        } else {
+          setReviews([]);
+        }
       } catch (e) {
         console.error('Error fetching store data:', e);
       } finally {
@@ -202,15 +282,33 @@ const StorePage = () => {
           }}>
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
-                <img src={store.logo} alt={store.name} className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-4 transition-colors duration-300 ${isDarkMode ? 'border-white/70' : 'border-gray-300'}`} />
-            <div>
-                  <h1 className={`text-3xl md:text-5xl font-extrabold leading-tight transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>{store.name}</h1>
-                  <p className={`mt-1 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{store.description}</p>
-            </div>
+                    <img src={store.logo} alt={store.name} className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-4 transition-colors duration-300 ${isDarkMode ? 'border-white/70' : 'border-gray-300'}`} />
+                <div>
+                      <h1 className={`text-3xl md:text-5xl font-extrabold leading-tight transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>{store.name}</h1>
+                      <p className={`mt-1 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{store.description}</p>
+                      <div className="mt-2 text-sm text-gray-500 flex items-center gap-4">
+                        {store.average_rating && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{store.average_rating}</span>
+                            <span className="text-xs text-gray-400">({store.total_reviews || 0} reviews)</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 text-sm text-gray-500">
+                        {store.owner && <span className="mr-4">Owner: <span className="font-medium">{store.owner}</span></span>}
+                        {store.email && <a className="mr-4 text-indigo-500" href={`mailto:${store.email}`}>{store.email}</a>}
+                        {store.telephone && <a className="text-indigo-500" href={`tel:${store.telephone}`}>{store.telephone}</a>}
+                      </div>
+                      <div className="mt-2 flex items-center gap-3">
+                        {store.facebook && <a href={store.facebook} target="_blank" rel="noreferrer" className="text-sm text-blue-600">Facebook</a>}
+                        {store.twitter && <a href={store.twitter} target="_blank" rel="noreferrer" className="text-sm text-sky-500">Twitter</a>}
+                        {store.instagram && <a href={store.instagram} target="_blank" rel="noreferrer" className="text-sm text-pink-500">Instagram</a>}
+                      </div>
+                </div>
           </div>
               <div className="flex-1" />
-              <a href="#products" className="inline-block px-6 py-3 rounded-full font-semibold"
-                 style={{ background: 'linear-gradient(90deg,#00E5FF,#FF00FF)', boxShadow: '0 0 24px rgba(0,229,255,0.35)' }}>EXPLORE</a>
+          <a href="#products" className="inline-block px-6 py-3 rounded-full font-semibold"
+            style={{ background: 'linear-gradient(90deg,#00E5FF,#FF00FF)', boxShadow: '0 0 24px rgba(0,229,255,0.35)' }}>EXPLORE</a>
           </div>
         </div>
       </div>
@@ -236,7 +334,7 @@ const StorePage = () => {
                       <h3 className={`font-semibold transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>
                         <RouterLink to={`/product/${product.id}`}>{product.name}</RouterLink>
                       </h3>
-                      <span className="text-cyan-300 font-bold">${product.price}</span>
+                      <span className="text-cyan-300 font-bold">{product.priceDisplay ? product.priceDisplay : `$${product.price}`}</span>
                         </div>
                     <p className={`text-xs mb-3 line-clamp-2 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{product.description}</p>
                       <div className="flex items-center justify-between">
