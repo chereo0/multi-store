@@ -10,6 +10,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
 import { ToastProvider } from "./context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { WishlistProvider } from "./context/WishlistContext";
 import { Toaster } from "react-hot-toast";
 import Navbar from "./components/Navbar";
 
@@ -77,18 +78,20 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <CartProvider>
-          <ToastProvider>
-            <Router>
-              <div className="App">
-                <Navbar />
-                <AnimatedRoutes />
-                <Toaster
-                  position="top-right"
-                  toastOptions={{ duration: 2000 }}
-                />
-              </div>
-            </Router>
-          </ToastProvider>
+          <WishlistProvider>
+            <ToastProvider>
+              <Router>
+                <div className="App">
+                  <Navbar />
+                  <AnimatedRoutes />
+                  <Toaster
+                    position="top-right"
+                    toastOptions={{ duration: 2000 }}
+                  />
+                </div>
+              </Router>
+            </ToastProvider>
+          </WishlistProvider>
         </CartProvider>
       </AuthProvider>
     </ThemeProvider>

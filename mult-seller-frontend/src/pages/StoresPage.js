@@ -14,64 +14,22 @@ const StoresPage = () => {
         setLoading(true);
         const response = await getHomePageBuilder();
         if (response && response.success && response.data) {
-          const homeData = response.data;
+          let fetched = [];
+          // homepage builder returns an array of widgets — find one that contains stores/products/items
+          if (Array.isArray(response.data)) {
+            const widget = response.data.find(
+              (it) =>
+                Array.isArray(it.stores) ||
+                Array.isArray(it.products) ||
+                Array.isArray(it.items)
+            );
+            fetched =
+              (widget && (widget.stores || widget.products || widget.items)) ||
+              [];
+          } else if (Array.isArray(response.data.stores)) {
+            fetched = response.data.stores;
+          }
 
-            // Robust extractor: search for arrays inside homeData that look like stores
-            const extractStores = (d) => {
-              const results = [];
-
-              const testArray = (arr) => {
-                if (!Array.isArray(arr)) return false;
-                // consider an array of store-like objects if many items have a name and some id
-                const sample = arr.slice(0, 5);
-                const score = sample.reduce((s, it) => {
-                  if (!it || typeof it !== 'object') return s;
-                  if (it.name && (it.id || it.store_id || it.slug || it.storeId || it._id)) return s + 2;
-                  if (it.name) return s + 1;
-                  return s;
-                }, 0);
-                return score >= sample.length; // heuristic: most items appear store-like
-              };
-
-              // If top-level is array, check candidates
-              if (Array.isArray(d)) {
-                for (const item of d) {
-                  if (Array.isArray(item?.stores)) results.push(...item.stores);
-                  if (Array.isArray(item?.products)) results.push(...item.products);
-                  if (Array.isArray(item?.items)) results.push(...item.items);
-                  // direct arrays of store-like objects
-                  if (Array.isArray(item) && testArray(item)) results.push(...item);
-                }
-                // also check if the array itself looks like store list
-                if (testArray(d)) results.push(...d);
-              } else if (d && typeof d === 'object') {
-                // check common keys
-                if (Array.isArray(d.stores)) results.push(...d.stores);
-                if (Array.isArray(d.products)) results.push(...d.products);
-                if (Array.isArray(d.items)) results.push(...d.items);
-                // also inspect nested arrays one level deep
-                for (const k of Object.keys(d)) {
-                  const v = d[k];
-                  if (Array.isArray(v) && testArray(v)) results.push(...v);
-                }
-              }
-
-              return results;
-            };
-
-            let fetched = extractStores(homeData) || [];
-
-            // Deduplicate by id/slug/name
-            const seen = new Set();
-            fetched = fetched.filter((s) => {
-              const idKey = s?.id ?? s?.store_id ?? s?.slug ?? s?.storeId ?? s?._id ?? s?.name;
-              if (!idKey) return false;
-              if (seen.has(String(idKey))) return false;
-              seen.add(String(idKey));
-              return true;
-            });
-
-            console.log('Stores extracted from home_page_builder:', fetched.length, fetched.slice(0, 3));
           setStores(fetched || []);
         }
       } catch (error) {

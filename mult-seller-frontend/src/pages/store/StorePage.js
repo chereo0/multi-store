@@ -6,7 +6,8 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useTheme } from '../../context/ThemeContext';
-import { getStore, getProducts, getStoreReviews } from '../../api/services';
+import { useWishlist } from '../../context/WishlistContext';
+import { getStore, getProducts, getStoreReviews, submitStoreReview } from '../../api/services';
 
 const StorePage = () => {
   const { storeId } = useParams();
@@ -16,10 +17,12 @@ const StorePage = () => {
   const [loading, setLoading] = useState(true);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+  const [showWishlistOnly, setShowWishlistOnly] = useState(false);
 
   const { user } = useAuth();
   const { addToCart, getStoreItemsCount, getQuantityForProduct } = useCart();
   const { isDarkMode, colors } = useTheme();
+  const { toggleWishlist, isInWishlist } = useWishlist();
 
   // Place all hooks BEFORE any conditional returns to satisfy hooks rules
   // Auto-detect background from /public (prioritize your template)
@@ -144,9 +147,17 @@ const StorePage = () => {
     fetchData();
   }, [storeId]);
 
-  const handleAddToCart = (product) => {
-    addToCart(product, storeId);
-    toast.success(`${product.name} added to cart`);
+  const handleAddToCart = async (product) => {
+    try {
+      const res = await addToCart(product, storeId);
+      // addToCart will already show server error as a toast on failure.
+      if (res && res.success) {
+        toast.success(`${product.name} added to cart`);
+      }
+    } catch (err) {
+      // Defensive: addToCart should return structured response, but show toast if it throws
+      toast.error(err?.message || String(err) || 'Could not add to cart');
+    }
   };
 
   const handleSubmitReview = async (e) => {
@@ -155,20 +166,40 @@ const StorePage = () => {
       alert('Please login to submit a review');
       return;
     }
-
-    const review = {
-      id: Date.now(),
+    // Build optimistic review object for immediate UI feedback
+    const tempId = `temp-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
       userId: user.id,
       userName: user.name,
       userAvatar: user.avatar,
       rating: newReview.rating,
       comment: newReview.comment,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
     };
 
-    setReviews([review, ...reviews]);
+    // Optimistically update UI
+    setReviews((prev) => [optimistic, ...prev]);
     setNewReview({ rating: 5, comment: '' });
     setShowReviewForm(false);
+
+    // Send to server using expected payload { text, rating }
+    try {
+      const res = await submitStoreReview(storeId, { text: optimistic.comment, rating: optimistic.rating });
+      if (res && res.success) {
+        toast.success('Review submitted');
+        // Optionally replace temp review with returned server review (if provided)
+        if (res.data) {
+          setReviews((prev) => prev.map((r) => (r.id === tempId ? res.data : r)));
+        }
+      } else {
+        throw new Error(res?.message || res?.error || 'Failed to submit review');
+      }
+    } catch (err) {
+      // Revert optimistic update on failure
+      setReviews((prev) => prev.filter((r) => r.id !== tempId));
+      toast.error(`Could not submit review: ${err?.message || err}`);
+    }
   };
 
   if (loading) {
@@ -286,15 +317,15 @@ const StorePage = () => {
                 <div>
                       <h1 className={`text-3xl md:text-5xl font-extrabold leading-tight transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>{store.name}</h1>
                       <p className={`mt-1 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{store.description}</p>
-                      <div className="mt-2 text-sm text-gray-500 flex items-center gap-4">
+                      <div className={`mt-2 text-sm flex items-center gap-4 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
                         {store.average_rating && (
                           <div className="flex items-center gap-2">
                             <span className="font-semibold">{store.average_rating}</span>
-                            <span className="text-xs text-gray-400">({store.total_reviews || 0} reviews)</span>
+                            <span className={`text-xs ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>({store.total_reviews || 0} reviews)</span>
                           </div>
                         )}
                       </div>
-                      <div className="mt-2 text-sm text-gray-500">
+                      <div className={`mt-2 text-sm ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
                         {store.owner && <span className="mr-4">Owner: <span className="font-medium">{store.owner}</span></span>}
                         {store.email && <a className="mr-4 text-indigo-500" href={`mailto:${store.email}`}>{store.email}</a>}
                         {store.telephone && <a className="text-indigo-500" href={`tel:${store.telephone}`}>{store.telephone}</a>}
@@ -317,15 +348,52 @@ const StorePage = () => {
       {/* Featured Products */}
       <section id="products" className="pb-20" aria-label="Featured products">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 id="featured" className={`text-2xl md:text-3xl font-bold mb-6 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`} style={{ textShadow: isDarkMode ? '0 0 20px rgba(0,229,255,0.4)' : 'none' }}>FEATURED PRODUCTS</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 id="featured" className={`text-2xl md:text-3xl font-bold transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`} style={{ textShadow: isDarkMode ? '0 0 20px rgba(0,229,255,0.4)' : 'none' }}>FEATURED PRODUCTS</h2>
+            <button
+              onClick={() => setShowWishlistOnly(!showWishlistOnly)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-300 ${
+                showWishlistOnly
+                  ? 'bg-pink-600 text-white'
+                  : isDarkMode
+                  ? 'bg-white/10 text-white hover:bg-white/20'
+                  : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+              }`}
+            >
+              {showWishlistOnly ? '❤️ Wishlist' : '🤍 Show Wishlist'}
+            </button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {products.map((product) => {
+              {products
+                .filter((product) => !showWishlistOnly || isInWishlist(product.id))
+                .map((product) => {
                 const qty = getQuantityForProduct(product.id, storeId);
+                const inWishlist = isInWishlist(product.id);
                 return (
-                <div key={product.id} className="rounded-2xl overflow-hidden backdrop-blur-sm" style={{
+                <div key={product.id} className="rounded-2xl overflow-hidden backdrop-blur-sm relative" style={{
                   background: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)',
                   border: isDarkMode ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.1)'
                 }}>
+                  {/* Wishlist Icon */}
+                  <button
+                    onClick={() => toggleWishlist(product.id)}
+                    className="absolute top-2 right-2 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-200 hover:scale-110"
+                    style={{
+                      background: inWishlist ? 'rgba(236, 72, 153, 0.9)' : 'rgba(0, 0, 0, 0.3)',
+                    }}
+                    aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                  >
+                    {inWishlist ? (
+                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    )}
+                  </button>
+                  
                   <div className={`h-40 flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-black/30' : 'bg-gray-100'}`}>
                     <img src={product.image} alt={product.name} className="w-24 h-24 object-contain" />
                       </div>
@@ -385,7 +453,14 @@ const StorePage = () => {
                     </div>
                     <div className="mb-4">
                     <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>Comment</label>
-                    <textarea value={newReview.comment} onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })} className="w-full px-3 py-2 rounded-md text-black" rows={4} placeholder="Share your experience with this store..." required />
+                    <textarea
+                      value={newReview.comment}
+                      onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                      className={`w-full px-3 py-2 rounded-md transition-colors duration-200 ${isDarkMode ? 'bg-gray-800/60 placeholder-gray-300' : 'bg-white placeholder-gray-500'} ${colors[isDarkMode ? 'dark' : 'light'].text}`}
+                      rows={4}
+                      placeholder="Share your experience with this store..."
+                      required
+                    />
                     </div>
                   <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-md">Submit Review</button>
                   </form>

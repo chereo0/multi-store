@@ -346,10 +346,25 @@ export const getProductReviews = async (productId) => {
 };
 
 export const submitStoreReview = async (storeId, reviewData) => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  // In real implementation, this would send data to backend
-  return { success: true, message: "Review submitted successfully" };
+  // Send review to backend: expects { text, rating }
+  try {
+    const payload = {
+      text: reviewData.text ?? reviewData.comment ?? '',
+      rating: reviewData.rating ?? null,
+    };
+
+    const res = await api.post(`/store/${storeId}/review`, payload);
+    if (res && res.data) {
+      const body = res.data;
+      const ok = body.success === 1 || body.success === true || body.status === 'success' || !!body.data;
+      return { success: !!ok, data: body.data || null, message: body.message || null };
+    }
+    return { success: false, message: 'No response from server' };
+  } catch (err) {
+    console.warn('submitStoreReview failed:', err?.message || err);
+    // Return a structured failure so callers can revert optimistic updates
+    return { success: false, error: err?.message || String(err) };
+  }
 };
 
 export const submitProductReview = async (productId, reviewData) => {
@@ -357,6 +372,329 @@ export const submitProductReview = async (productId, reviewData) => {
   await new Promise((resolve) => setTimeout(resolve, 500));
   // In real implementation, this would send data to backend
   return { success: true, message: "Review submitted successfully" };
+};
+
+// Add to cart (POST /cart)
+export const addToCart = async (cartData) => {
+  try {
+    const res = await api.post('/cart', cartData);
+    console.log('addToCart API raw response:', res);
+    console.log('addToCart API response data:', res.data);
+    
+    if (res && res.data) {
+      const body = res.data;
+      const ok = body.success === 1 || body.success === true || body.status === 'success';
+      
+      const result = { 
+        success: ok ? 1 : 0, 
+        data: body.data || null, 
+        message: body.message || null,
+        error: body.error || null
+      };
+      
+      console.log('addToCart returning:', result);
+      return result;
+    }
+    return { success: 0, message: 'No response from server' };
+  } catch (err) {
+    console.warn('addToCart caught error:', err);
+    console.log('addToCart error response:', err?.response?.data);
+    
+    // Check if error response has data from server (status 400 with validation errors)
+    if (err?.response?.data) {
+      const body = err.response.data;
+      const result = {
+        success: body.success || 0,
+        data: body.data || null,
+        message: body.message || null,
+        error: body.error || null
+      };
+      console.log('addToCart returning error response:', result);
+      return result;
+    }
+    
+    return { success: 0, error: err?.message || String(err) };
+  }
+};
+
+// Get cart (GET /cart)
+export const getCart = async () => {
+  try {
+    const res = await api.get('/cart');
+    if (res && res.data) {
+      const body = res.data;
+      const data = body.data || body;
+      const ok = body.success === 1 || body.success === true || !!body.data;
+      return { success: !!ok, data };
+    }
+    return { success: false, data: null };
+  } catch (err) {
+    console.warn('getCart failed:', err?.message || err);
+    return { success: false, data: null, error: err?.message || String(err) };
+  }
+};
+
+// Empty/clear cart (DELETE /cart/empty)
+export const emptyCart = async () => {
+  try {
+    const res = await api.delete('/cart/empty');
+    console.log('emptyCart API response:', res);
+    
+    if (res && res.data) {
+      const body = res.data;
+      const ok = body.success === 1 || body.success === true || body.status === 'success';
+      
+      const result = { 
+        success: ok ? 1 : 0, 
+        message: body.message || 'Cart cleared successfully',
+        data: body.data || null
+      };
+      
+      console.log('emptyCart returning:', result);
+      return result;
+    }
+    return { success: 1, message: 'Cart cleared' };
+  } catch (err) {
+    console.warn('emptyCart caught error:', err);
+    
+    // Even if server returns error, we might want to clear local cart
+    if (err?.response?.data) {
+      const body = err.response.data;
+      return {
+        success: body.success || 0,
+        message: body.message || null,
+        error: body.error || null
+      };
+    }
+    
+    return { success: 0, error: err?.message || String(err) };
+  }
+};
+
+// Remove product from cart (DELETE /cart/:key)
+export const removeFromCartAPI = async (key) => {
+  try {
+    const res = await api.delete(`/cart/${key}`);
+    console.log('removeFromCartAPI response:', res);
+    
+    if (res && res.data) {
+      const body = res.data;
+      const ok = body.success === 1 || body.success === true || body.status === 'success';
+      
+      const result = { 
+        success: ok ? 1 : 0, 
+        message: body.message || 'Item removed from cart',
+        data: body.data || null
+      };
+      
+      console.log('removeFromCartAPI returning:', result);
+      return result;
+    }
+    return { success: 1, message: 'Item removed' };
+  } catch (err) {
+    console.warn('removeFromCartAPI caught error:', err);
+    
+    if (err?.response?.data) {
+      const body = err.response.data;
+      return {
+        success: body.success || 0,
+        message: body.message || null,
+        error: body.error || null
+      };
+    }
+    
+    return { success: 0, error: err?.message || String(err) };
+  }
+};
+
+// Update cart (PUT /cart)
+export const updateCartAPI = async (cartData) => {
+  try {
+    const res = await api.put('/cart', cartData);
+    console.log('updateCartAPI raw response:', res);
+    console.log('updateCartAPI response data:', res.data);
+    
+    if (res && res.data) {
+      const body = res.data;
+      const ok = body.success === 1 || body.success === true || body.status === 'success';
+      
+      const result = { 
+        success: ok ? 1 : 0, 
+        data: body.data || null, 
+        message: body.message || 'Cart updated successfully',
+        error: body.error || null
+      };
+      
+      console.log('updateCartAPI returning:', result);
+      return result;
+    }
+    return { success: 0, message: 'No response from server' };
+  } catch (err) {
+    console.warn('updateCartAPI caught error:', err);
+    console.log('updateCartAPI error response:', err?.response?.data);
+    
+    // Check if error response has data from server (status 400 with validation errors)
+    if (err?.response?.data) {
+      const body = err.response.data;
+      const result = {
+        success: body.success || 0,
+        data: body.data || null,
+        message: body.message || null,
+        error: body.error || null
+      };
+      console.log('updateCartAPI returning error response:', result);
+      return result;
+    }
+    
+    return { success: 0, error: err?.message || String(err) };
+  }
+};
+
+// Get wishlist (GET /wishlist)
+export const getWishlist = async () => {
+  try {
+    const res = await api.get('/wishlist');
+    console.log('getWishlist response:', res);
+    
+    if (res && res.data) {
+      const body = res.data;
+      const data = body.data || body;
+      const ok = body.success === 1 || body.success === true || !!body.data;
+      return { success: !!ok, data };
+    }
+    return { success: false, data: [] };
+  } catch (err) {
+    console.warn('getWishlist failed:', err?.message || err);
+    return { success: false, data: [], error: err?.message || String(err) };
+  }
+};
+
+// Add to wishlist (POST /wishlist/:id)
+export const addToWishlist = async (productId) => {
+  try {
+    console.log('addToWishlist: Attempting to add product', productId);
+    console.log('addToWishlist: Auth token in localStorage:', localStorage.getItem('auth_token'));
+    console.log('addToWishlist: User in localStorage:', localStorage.getItem('user'));
+    
+    // Check what token will actually be sent
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+    const clientToken = localStorage.getItem('client_token');
+    console.log('addToWishlist: Token to be used:', token ? 'auth_token' : 'client_token');
+    console.log('addToWishlist: Token value:', token || clientToken);
+    
+    const res = await api.post(`/wishlist/${productId}`);
+    
+    if (res && res.data) {
+      const body = res.data;
+      
+      // Check if server returned HTML error (database error)
+      if (typeof body === 'string' && (body.includes('Fatal error') || body.includes('<!DOCTYPE') || body.includes('<html'))) {
+        console.error('Server returned HTML error:', body.substring(0, 200));
+        return {
+          success: 0,
+          message: 'Server database error',
+          data: null,
+          error: 'The server is experiencing database connection issues. Please contact support.'
+        };
+      }
+      
+      const ok = body.success === 1 || body.success === true || body.status === 'success';
+      
+      const result = { 
+        success: ok ? 1 : 0, 
+        message: body.message || 'Added to wishlist',
+        data: body.data || null,
+        error: body.error || null
+      };
+      
+      console.log('addToWishlist returning:', result);
+      return result;
+    }
+    return { success: 1, message: 'Added to wishlist' };
+  } catch (err) {
+    console.warn('addToWishlist caught error:', err);
+    console.log('addToWishlist error response:', err?.response?.data);
+    
+    if (err?.response?.data) {
+      const body = err.response.data;
+      
+      // Check if error response is HTML
+      if (typeof body === 'string' && (body.includes('Fatal error') || body.includes('<!DOCTYPE') || body.includes('<html'))) {
+        return {
+          success: 0,
+          message: 'Server database error',
+          error: 'The server is experiencing database connection issues. Please contact support.'
+        };
+      }
+      
+      return {
+        success: body.success || 0,
+        message: body.message || null,
+        error: body.error || null
+      };
+    }
+    
+    return { success: 0, error: err?.message || String(err) };
+  }
+};
+
+// Remove from wishlist (DELETE /wishlist/:id)
+export const removeFromWishlist = async (productId) => {
+  try {
+    const res = await api.delete(`/wishlist/${productId}`);
+    console.log('removeFromWishlist response:', res);
+    
+    if (res && res.data) {
+      const body = res.data;
+      
+      // Check if server returned HTML error (database error)
+      if (typeof body === 'string' && (body.includes('Fatal error') || body.includes('<!DOCTYPE') || body.includes('<html'))) {
+        console.error('Server returned HTML error:', body.substring(0, 200));
+        return {
+          success: 0,
+          message: 'Server database error',
+          data: null,
+          error: 'The server is experiencing database connection issues. Please contact support.'
+        };
+      }
+      
+      const ok = body.success === 1 || body.success === true || body.status === 'success';
+      
+      const result = { 
+        success: ok ? 1 : 0, 
+        message: body.message || 'Removed from wishlist',
+        data: body.data || null,
+        error: body.error || null
+      };
+      
+      console.log('removeFromWishlist returning:', result);
+      return result;
+    }
+    return { success: 1, message: 'Removed from wishlist' };
+  } catch (err) {
+    console.warn('removeFromWishlist caught error:', err);
+    
+    if (err?.response?.data) {
+      const body = err.response.data;
+      
+      // Check if error response is HTML
+      if (typeof body === 'string' && (body.includes('Fatal error') || body.includes('<!DOCTYPE') || body.includes('<html'))) {
+        return {
+          success: 0,
+          message: 'Server database error',
+          error: 'The server is experiencing database connection issues. Please contact support.'
+        };
+      }
+      
+      return {
+        success: body.success || 0,
+        message: body.message || null,
+        error: body.error || null
+      };
+    }
+    
+    return { success: 0, error: err?.message || String(err) };
+  }
 };
 
 export const submitOrder = async (orderData) => {
@@ -542,6 +880,30 @@ export const getClientCredentialsToken = async (
   return response.data;
 };
 
+// Get user token using OAuth2 Password Grant (not supported by backend, will fail silently)
+export const getUserToken = async (email, password) => {
+  try {
+    const payload = new URLSearchParams();
+    payload.append("client_id", process.env.REACT_APP_OAUTH_CLIENT_ID || "shopping_oauth_client");
+    payload.append("client_secret", process.env.REACT_APP_OAUTH_CLIENT_SECRET || "shopping_oauth_secret");
+    payload.append("grant_type", "password");
+    payload.append("username", email);
+    payload.append("password", password);
+    
+    const tokenUrl = "https://multi-store-api.cloudgoup.com/api/rest/oauth2/token";
+    
+    const response = await api.post(tokenUrl, payload, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    
+    return response.data;
+  } catch (error) {
+    // Backend doesn't support password grant - this is expected
+    // Return null to indicate token fetch failed
+    return null;
+  }
+};
+
 export const fetchAndStoreClientToken = async () => {
   const data = await getClientCredentialsToken();
   const token = data?.access_token || data?.token || data?.data?.access_token;
@@ -641,12 +1003,58 @@ export const loginUser = async (email, password) => {
     if (response.ok) {
       // Handle both success: 1 and success: true patterns
       if (data.success === 1 || data.success === true) {
+        // Try to get user-specific OAuth token using password grant (silently fail if not supported)
+        try {
+          const userTokenData = await getUserToken(email, password);
+          if (userTokenData && userTokenData.access_token) {
+            console.log("Successfully obtained user OAuth token");
+            // Add the token to the response
+            data.auth_token = userTokenData.access_token;
+            data.token_type = userTokenData.token_type;
+            data.expires_in = userTokenData.expires_in;
+          }
+        } catch (tokenError) {
+          // Silently ignore OAuth2 errors - backend doesn't support password grant
+          // This is expected and doesn't affect login success
+          console.log("OAuth2 password grant not supported by backend (expected)");
+        }
+        
         return { success: true, ...data };
       } else {
+        // Check if error is "User is logged." - logout and retry
+        if (data.error && Array.isArray(data.error) && 
+            data.error.some(err => err.includes("User is logged"))) {
+          console.log("User already logged in on backend, logging out first...");
+          await logoutUser();
+          
+          // Retry login after logout
+          console.log("Retrying login after logout...");
+          const retryResponse = await fetch(
+            "https://multi-store-api.cloudgoup.com/api/rest/login",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(payload),
+            }
+          );
+          
+          const retryData = await retryResponse.json();
+          
+          if (retryResponse.ok && (retryData.success === 1 || retryData.success === true)) {
+            console.log("Login successful after logout");
+            return { success: true, ...retryData };
+          }
+        }
+        
         return {
           success: false,
           message: data.message || "Login failed",
           errors: data.errors,
+          error: data.error,
         };
       }
     } else {
@@ -668,32 +1076,50 @@ export const logoutUser = async () => {
     const userToken =
       localStorage.getItem("auth_token") ||
       sessionStorage.getItem("auth_token");
-    if (!userToken) {
+    const clientToken = localStorage.getItem("client_token");
+    
+    // Use client token if no user token available
+    const tokenToUse = userToken || clientToken;
+    
+    if (!tokenToUse) {
+      console.log("No token available for logout, clearing local state only");
       return { success: true };
     }
+    
+    console.log("Attempting logout with token...");
     const response = await fetch(
       "https://multi-store-api.cloudgoup.com/api/rest/logout",
       {
         method: "POST",
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tokenToUse}`,
         },
+        credentials: 'include', // Include cookies for session-based auth
       }
     );
+    
+    console.log("Logout response status:", response.status);
+    
     // Many APIs return 200 or 204; some return success=1. Treat any 2xx as success
     if (response.ok) {
+      console.log("Logout successful");
       return { success: true };
     }
+    
     // Parse body for diagnostics but still let frontend clear state
     let data = null;
     try {
       data = await response.json();
+      console.log("Logout response data:", data);
     } catch (_) {}
-    return { success: false, data };
+    
+    console.log("Logout completed (non-ok response but proceeding)");
+    return { success: true, data }; // Changed to success: true to allow frontend cleanup
   } catch (e) {
     console.warn("Logout request failed, proceeding to clear local state:", e);
-    return { success: false };
+    return { success: true }; // Changed to success: true to allow frontend cleanup
   }
 };
 
@@ -997,9 +1423,27 @@ export const getHomePageBuilder = async () => {
     }
 
     const response = await api.get("/home_page_builder");
-    const data = response.data;
+    let data = response.data;
 
     console.log("Homepage builder raw response:", data);
+
+    // Fix backend debug output issue - clean the response if it's a string with debug output
+    if (typeof data === 'string') {
+      // Backend is returning debug output like: string(2) "80"\n{actual json}
+      // Extract just the JSON part
+      try {
+        // Find the first { or [ which indicates start of JSON
+        const jsonStart = Math.max(data.indexOf('{'), data.indexOf('['));
+        if (jsonStart > 0) {
+          const cleanJson = data.substring(jsonStart);
+          data = JSON.parse(cleanJson);
+          console.log("Homepage builder: Cleaned debug output, parsed JSON successfully");
+        }
+      } catch (parseError) {
+        console.error("Homepage builder: Failed to parse cleaned JSON:", parseError);
+        // Continue with original data
+      }
+    }
 
     if (data && (data.success === 1 || data.success === true)) {
       return { success: true, data: data.data || data };

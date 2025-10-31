@@ -56,14 +56,20 @@ export const AuthProvider = ({ children }) => {
 
   // Clear auth function
   const clearAuth = () => {
+    console.log("AuthContext: Clearing all auth data...");
     setUser(null);
     setTokenValid(true); // Reset to true since we're not validating
+    
+    // Clear all possible user and token keys from both storages
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     localStorage.removeItem("auth_token");
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("auth_token");
+    sessionStorage.removeItem("token");
+    
     clearAuthToken();
+    console.log("AuthContext: Auth data cleared");
   };
 
   useEffect(() => {
@@ -263,16 +269,16 @@ export const AuthProvider = ({ children }) => {
           result.data?.token ||
           result.data?.access_token ||
           result.data?.auth_token ||
-          result.auth_token;
+          result.auth_token;  // Check top-level auth_token added by getUserToken
         console.log("AuthContext: Looking for token in:", {
           "userData.token": userData.token,
           "userData.access_token": userData.access_token,
           "result.token": result.token,
           "result.access_token": result.access_token,
+          "result.auth_token": result.auth_token,
           "result.data?.token": result.data?.token,
           "result.data?.access_token": result.data?.access_token,
           "result.data?.auth_token": result.data?.auth_token,
-          "result.auth_token": result.auth_token,
           "Full result.data object": result.data,
         });
 
