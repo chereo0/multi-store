@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { registerUser, loginUser, logoutUser } from "../api/services";
+import { registerUser, loginUser, logoutUser, getProfile } from "../api/services";
 import { setAuthToken, clearAuthToken, api } from "../api";
 
 const AuthContext = createContext();
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
     console.log("AuthContext: Clearing all auth data...");
     setUser(null);
     setTokenValid(true); // Reset to true since we're not validating
-    
+
     // Clear all possible user and token keys from both storages
     localStorage.removeItem("user");
     localStorage.removeItem("token");
@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("auth_token");
     sessionStorage.removeItem("token");
-    
+
     clearAuthToken();
     console.log("AuthContext: Auth data cleared");
   };
@@ -227,30 +227,42 @@ export const AuthProvider = ({ children }) => {
       console.log("AuthContext: Login API result:", result);
 
       if (result.success) {
-        // Extract user data from API response
+        // Prefer normalized fields returned by services.loginUser
+        const normalizedUser = result.user || result.data?.user || null;
+        const normalizedToken =
+          result.token ||
+          result.auth_token ||
+          result.data?.auth_token ||
+          result.data?.token ||
+          result.data?.access_token ||
+          result.access_token ||
+          null;
+
+        // Extract user data from API response with robust fallbacks
         const userData = {
-          id: result.user?.id || result.data?.user?.id || result.data?.id,
-          email: userDataOrEmail,
+          id:
+            normalizedUser?.id ||
+            result.data?.id ||
+            normalizedUser?.user_id ||
+            normalizedUser?.customer_id ||
+            null,
+          email: normalizedUser?.email || userDataOrEmail,
           name:
-            result.user?.name ||
-            result.data?.user?.name ||
-            `${result.user?.firstname || result.data?.user?.firstname || ""} ${
-              result.user?.lastname || result.data?.user?.lastname || ""
+            normalizedUser?.name ||
+            `${normalizedUser?.firstname || ""} ${
+              normalizedUser?.lastname || ""
             }`.trim() ||
+            result.data?.user?.name ||
             "User",
-          firstname: result.user?.firstname || result.data?.user?.firstname,
-          lastname: result.user?.lastname || result.data?.user?.lastname,
-          username: result.user?.username || result.data?.user?.username,
-          telephone: result.user?.telephone || result.data?.user?.telephone,
+          firstname: normalizedUser?.firstname || result.data?.user?.firstname,
+          lastname: normalizedUser?.lastname || result.data?.user?.lastname,
+          username: normalizedUser?.username || result.data?.user?.username,
+          telephone: normalizedUser?.telephone || result.data?.user?.telephone,
           avatar:
-            result.user?.avatar ||
+            normalizedUser?.avatar ||
             result.data?.user?.avatar ||
             "https://via.placeholder.com/40",
-          token:
-            result.token ||
-            result.data?.token ||
-            result.access_token ||
-            result.data?.access_token,
+          token: normalizedToken,
         };
 
         setUser(userData);
@@ -262,14 +274,11 @@ export const AuthProvider = ({ children }) => {
 
         // Store auth token if provided - check multiple possible token fields
         const token =
+          normalizedToken ||
           userData.token ||
           userData.access_token ||
-          result.token ||
-          result.access_token ||
-          result.data?.token ||
-          result.data?.access_token ||
           result.data?.auth_token ||
-          result.auth_token;  // Check top-level auth_token added by getUserToken
+          result.auth_token;
         console.log("AuthContext: Looking for token in:", {
           "userData.token": userData.token,
           "userData.access_token": userData.access_token,
@@ -299,6 +308,33 @@ export const AuthProvider = ({ children }) => {
             "AuthContext: Proceeding without auth token - using client token for API calls"
           );
           // Don't clear auth token - let API functions use client token as fallback
+        }
+
+        // After storing token, if the user id is missing, try to hydrate from /account
+        try {
+          if (!userData.id && token) {
+            const profile = await getProfile();
+            if (profile?.success && profile.data) {
+              const p = profile.data;
+              const hydrated = {
+                id: p.id || p.user_id || p.customer_id || userData.id,
+                name:
+                  p.name ||
+                  [p.firstname, p.lastname].filter(Boolean).join(" ") ||
+                  userData.name,
+                email: p.email || userData.email,
+                firstname: p.firstname ?? userData.firstname,
+                lastname: p.lastname ?? userData.lastname,
+                username: p.username ?? userData.username,
+                telephone: p.telephone ?? userData.telephone,
+                avatar: p.avatar || userData.avatar,
+              };
+              updateUser(hydrated);
+              console.log("AuthContext: Hydrated user from profile:", hydrated);
+            }
+          }
+        } catch (e) {
+          console.warn("AuthContext: Failed to hydrate profile:", e?.message || e);
         }
 
         return { success: true };

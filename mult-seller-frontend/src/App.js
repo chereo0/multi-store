@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -30,6 +30,7 @@ import StoresPage from "./pages/StoresPage";
 import ContactPage from "./pages/ContactPage";
 import ProfilePage from "./pages/ProfilePage";
 import AddressPage from "./pages/AddressPage";
+import { useInitialApiCall } from "./hooks/useApiCall";
 
 const AnimatedRoutes = () => {
   const location = useLocation();
@@ -59,20 +60,18 @@ const AnimatedRoutes = () => {
 };
 
 function App() {
-  useEffect(() => {
-    // Initialize client token on app start
-    (async () => {
-      try {
-        const mod = await import("./api/services");
-        if (typeof mod.getClientToken === "function") {
-          await mod.getClientToken();
-          console.log("Client token initialized");
-        }
-      } catch (error) {
-        console.error("Failed to initialize client token:", error);
+  // Initialize client token exactly once (guards against StrictMode double-invoke)
+  useInitialApiCall(async () => {
+    try {
+      const mod = await import("./api/services");
+      if (typeof mod.getClientToken === "function") {
+        await mod.getClientToken();
+        console.log("Client token initialized");
       }
-    })();
-  }, []);
+    } catch (error) {
+      console.error("Failed to initialize client token:", error);
+    }
+  });
 
   return (
     <ThemeProvider>

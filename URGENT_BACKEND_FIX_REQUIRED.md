@@ -1,9 +1,11 @@
 # URGENT: Backend API Fixes Required
 
 ## Problem 1: Missing Auth Token in Login Response
+
 The login API (`POST /api/rest/login`) successfully authenticates users but **does NOT return an authentication token** in the response.
 
 ## Problem 2: Debug Output in Production API
+
 The `/home_page_builder` endpoint is returning **PHP debug output** mixed with JSON, breaking the response format.
 
 ---
@@ -11,11 +13,13 @@ The `/home_page_builder` endpoint is returning **PHP debug output** mixed with J
 ## Issue 1: Missing Authentication Token
 
 ### Impact
+
 - Users cannot perform authenticated actions (wishlist, cart, profile)
 - Frontend receives error: `"You must login or create an account to save item to your wish list"`
 - App only works with public `client_token`, not user-specific tokens
 
 ### Current Login Response
+
 ```json
 {
   "success": 1,
@@ -31,6 +35,7 @@ The `/home_page_builder` endpoint is returning **PHP debug output** mixed with J
 ```
 
 ### Required Fix
+
 Add `auth_token` or `access_token` field to the login response:
 
 ```json
@@ -43,7 +48,7 @@ Add `auth_token` or `access_token` field to the login response:
     "lastname": "Anani",
     "email": "abdelrhmanelanani20@gmail.com",
     "telephone": "96170123456",
-    "auth_token": "USER_AUTHENTICATION_TOKEN_HERE"  // ← ADD THIS
+    "auth_token": "USER_AUTHENTICATION_TOKEN_HERE" // ← ADD THIS
   }
 }
 ```
@@ -53,20 +58,24 @@ Add `auth_token` or `access_token` field to the login response:
 ## Issue 2: Debug Output in Production
 
 ### Impact
+
 - Homepage API returns malformed response
 - JSON parsing errors
 - Unprofessional appearance in production
 
 ### Current Response
+
 ```
 string(2) "80"
 {"success":1,"error":[],"data":[...]}
 ```
 
 ### Problem
+
 There's a PHP `var_dump()`, `print_r()`, or `echo` statement before the JSON output. This is likely in the `/home_page_builder` endpoint or a middleware.
 
 ### Required Fix
+
 **Remove all debug statements from production code:**
 
 ```php
@@ -82,6 +91,7 @@ exit;
 ```
 
 ### How to Find It
+
 1. Search codebase for `var_dump`, `print_r`, `echo`, `var_export` in production files
 2. Check `/api/rest/home_page_builder` endpoint
 3. Check any middleware or authentication filters
@@ -90,7 +100,9 @@ exit;
 ---
 
 ## Alternative Acceptable Token Field Names
+
 Any of these field names would work for the auth token:
+
 - `data.auth_token` ✅ Preferred
 - `data.access_token`
 - `data.token`
@@ -102,6 +114,7 @@ Any of these field names would work for the auth token:
 ## Steps to Fix Issue 1 (Auth Token)
 
 ### Option 1: Return JWT Token After Login
+
 ```php
 // In your login controller
 $response = [
@@ -119,7 +132,9 @@ $response = [
 ```
 
 ### Option 2: Use Existing OAuth Token System
+
 If you already have an OAuth2 token system:
+
 ```php
 // Generate token for the logged-in user
 $token = $this->oauth->generateToken([
@@ -139,6 +154,7 @@ $response['data']['auth_token'] = $token['access_token'];
 ## Testing
 
 ### Test Login Endpoint:
+
 ```bash
 curl -X POST https://multi-store-api.cloudgoup.com/api/rest/login \
   -H "Content-Type: application/json" \
@@ -149,6 +165,7 @@ curl -X POST https://multi-store-api.cloudgoup.com/api/rest/login \
 **Expected response should include a token field!**
 
 ### Test Homepage Endpoint:
+
 ```bash
 curl https://multi-store-api.cloudgoup.com/api/rest/home_page_builder \
   -H "Authorization: Bearer CLIENT_TOKEN_HERE"
@@ -161,6 +178,7 @@ curl https://multi-store-api.cloudgoup.com/api/rest/home_page_builder \
 ## Additional Issues Found
 
 ### CORS Misconfiguration
+
 There's also a CORS misconfiguration where `Access-Control-Allow-Credentials` header is being sent twice (`'true, true'` instead of `'true'`). Please check for duplicate CORS middleware.
 
 ---

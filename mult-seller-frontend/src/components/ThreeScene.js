@@ -148,7 +148,7 @@ export default function ThreeScene({ formInteraction = 0 }) {
       )}
 
       {/* CSS Animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes gradientShift {
           0%, 100% { 
             background: linear-gradient(45deg, 
@@ -213,7 +213,7 @@ export default function ThreeScene({ formInteraction = 0 }) {
             transform: rotate(360deg); 
           }
         }
-      `}</style>
+  `}</style>
     </div>
   );
 }

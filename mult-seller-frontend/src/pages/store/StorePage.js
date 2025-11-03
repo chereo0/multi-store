@@ -1,13 +1,18 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Link as RouterLink, useParams } from 'react-router-dom';
-import { Canvas, useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
-import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
-import { useCart } from '../../context/CartContext';
-import { useTheme } from '../../context/ThemeContext';
-import { useWishlist } from '../../context/WishlistContext';
-import { getStore, getProducts, getStoreReviews, submitStoreReview } from '../../api/services';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, Link as RouterLink, useParams } from "react-router-dom";
+import { Canvas, useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+import toast from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
+import { useTheme } from "../../context/ThemeContext";
+import { useWishlist } from "../../context/WishlistContext";
+import {
+  getStore,
+  getProducts,
+  getStoreReviews,
+  submitStoreReview,
+} from "../../api/services";
 
 const StorePage = () => {
   const { storeId } = useParams();
@@ -16,7 +21,7 @@ const StorePage = () => {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+  const [newReview, setNewReview] = useState({ rating: 5, comment: "" });
   const [showWishlistOnly, setShowWishlistOnly] = useState(false);
 
   const { user } = useAuth();
@@ -26,25 +31,38 @@ const StorePage = () => {
 
   // Place all hooks BEFORE any conditional returns to satisfy hooks rules
   // Auto-detect background from /public (prioritize your template)
-  const nebulaCandidates = useMemo(() => ([
-    '/template.png',
-    '/Gemini_Generated_Image_bbj2vmbbj2vmbbj2.png',
-    '/Gemini_Generated_Image_pc6crxpc6crxpc6c.png',
-    '/Gemini_Generated_Image_enzgvmenzgvmenzg.png',
-    '/Gemini_Generated_Image_hy9bf7hy9bf7hy9b.png'
-  ]), []);
+  const nebulaCandidates = useMemo(
+    () => [
+      "/template.png",
+      "/Gemini_Generated_Image_bbj2vmbbj2vmbbj2.png",
+      "/Gemini_Generated_Image_pc6crxpc6crxpc6c.png",
+      "/Gemini_Generated_Image_enzgvmenzgvmenzg.png",
+      "/Gemini_Generated_Image_hy9bf7hy9bf7hy9b.png",
+    ],
+    []
+  );
   const [nebula, setNebula] = useState(nebulaCandidates[0]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       for (const url of nebulaCandidates) {
         try {
-          await new Promise((res, rej) => { const img = new Image(); img.onload = res; img.onerror = rej; img.src = url; });
-          if (!cancelled) { setNebula(url); break; }
+          await new Promise((res, rej) => {
+            const img = new Image();
+            img.onload = res;
+            img.onerror = rej;
+            img.src = url;
+          });
+          if (!cancelled) {
+            setNebula(url);
+            break;
+          }
         } catch (_) {}
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [nebulaCandidates]);
 
   useEffect(() => {
@@ -53,7 +71,7 @@ const StorePage = () => {
         const [storeResult, productsResult, reviewsResult] = await Promise.all([
           getStore(storeId),
           getProducts(storeId),
-          getStoreReviews(storeId)
+          getStoreReviews(storeId),
         ]);
 
         // Normalize store from direct API or from embedded store_info in the products response
@@ -63,32 +81,38 @@ const StorePage = () => {
 
         // If the products endpoint embeds store_info, merge it into existing store state
         const prodPayload = productsResult?.data;
-        const embedded = prodPayload?.data?.store_info || prodPayload?.store_info || prodPayload?.store || null;
+        const embedded =
+          prodPayload?.data?.store_info ||
+          prodPayload?.store_info ||
+          prodPayload?.store ||
+          null;
         if (embedded) {
           const mapped = {
             id: embedded.store_id || embedded.id,
             name: embedded.name,
-            owner: embedded.owner || embedded.store_owner || '',
-            description: embedded.description || '',
+            owner: embedded.owner || embedded.store_owner || "",
+            description: embedded.description || "",
             logo: embedded.profile_image || embedded.logo,
             banner: embedded.background_image || embedded.banner,
-            email: embedded.email || '',
-            telephone: embedded.telephone || embedded.phone || '',
-            address: embedded.address || '',
-            whatsapp: embedded.whatsapp || '',
-            facebook: embedded.facebook || '',
-            twitter: embedded.twitter || '',
-            instagram: embedded.instagram || '',
-            linkedin: embedded.linkedin || '',
-            youtube: embedded.youtube || '',
-            tiktok: embedded.tiktok || '',
-            product_limit: embedded.product_limit || embedded.productLimit || null,
-            opening_hours: embedded.opening_hours || embedded.opening_hours || null,
+            email: embedded.email || "",
+            telephone: embedded.telephone || embedded.phone || "",
+            address: embedded.address || "",
+            whatsapp: embedded.whatsapp || "",
+            facebook: embedded.facebook || "",
+            twitter: embedded.twitter || "",
+            instagram: embedded.instagram || "",
+            linkedin: embedded.linkedin || "",
+            youtube: embedded.youtube || "",
+            tiktok: embedded.tiktok || "",
+            product_limit:
+              embedded.product_limit || embedded.productLimit || null,
+            opening_hours:
+              embedded.opening_hours || embedded.opening_hours || null,
             status: embedded.status,
             date_added: embedded.date_added,
             date_modified: embedded.date_modified,
             average_rating: embedded.average_rating,
-            total_reviews: embedded.total_reviews
+            total_reviews: embedded.total_reviews,
           };
           setStore((prev) => ({ ...(prev || {}), ...mapped }));
         }
@@ -105,21 +129,29 @@ const StorePage = () => {
           // At this point p might still be an object (if we assigned prodPayload earlier), ensure array
           if (!Array.isArray(p)) {
             // If original data contained new_products nested under data, try that
-            const maybe = productsResult.data?.data?.new_products || productsResult.data?.new_products;
+            const maybe =
+              productsResult.data?.data?.new_products ||
+              productsResult.data?.new_products;
             p = Array.isArray(maybe) ? maybe : [];
           }
 
           // Normalize product fields (server uses product_id)
           const normalized = p.map((prod) => {
-            const rawPrice = prod.price || prod.price_text || prod.price_display || '';
-            const numeric = typeof rawPrice === 'string' ? parseFloat(rawPrice.replace(/[^0-9.]/g, '')) : rawPrice;
+            const rawPrice =
+              prod.price || prod.price_text || prod.price_display || "";
+            const numeric =
+              typeof rawPrice === "string"
+                ? parseFloat(rawPrice.replace(/[^0-9.]/g, ""))
+                : rawPrice;
             return {
               id: prod.product_id || prod.id,
-              name: prod.name || prod.title || 'Product',
-              image: prod.image || prod.image_url || prod.picture || '/no-image.png',
+              name: prod.name || prod.title || "Product",
+              image:
+                prod.image || prod.image_url || prod.picture || "/no-image.png",
               price: Number.isFinite(numeric) ? numeric : null,
-              priceDisplay: rawPrice || (Number.isFinite(numeric) ? `$${numeric}` : null),
-              description: prod.description || prod.short_description || '' ,
+              priceDisplay:
+                rawPrice || (Number.isFinite(numeric) ? `$${numeric}` : null),
+              description: prod.description || prod.short_description || "",
               inStock: prod.in_stock !== undefined ? !!prod.in_stock : true,
             };
           });
@@ -139,7 +171,7 @@ const StorePage = () => {
           setReviews([]);
         }
       } catch (e) {
-        console.error('Error fetching store data:', e);
+        console.error("Error fetching store data:", e);
       } finally {
         setLoading(false);
       }
@@ -156,14 +188,14 @@ const StorePage = () => {
       }
     } catch (err) {
       // Defensive: addToCart should return structured response, but show toast if it throws
-      toast.error(err?.message || String(err) || 'Could not add to cart');
+      toast.error(err?.message || String(err) || "Could not add to cart");
     }
   };
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!user) {
-      alert('Please login to submit a review');
+      alert("Please login to submit a review");
       return;
     }
     // Build optimistic review object for immediate UI feedback
@@ -175,25 +207,32 @@ const StorePage = () => {
       userAvatar: user.avatar,
       rating: newReview.rating,
       comment: newReview.comment,
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().split("T")[0],
     };
 
     // Optimistically update UI
     setReviews((prev) => [optimistic, ...prev]);
-    setNewReview({ rating: 5, comment: '' });
+    setNewReview({ rating: 5, comment: "" });
     setShowReviewForm(false);
 
     // Send to server using expected payload { text, rating }
     try {
-      const res = await submitStoreReview(storeId, { text: optimistic.comment, rating: optimistic.rating });
+      const res = await submitStoreReview(storeId, {
+        text: optimistic.comment,
+        rating: optimistic.rating,
+      });
       if (res && res.success) {
-        toast.success('Review submitted');
+        toast.success("Review submitted");
         // Optionally replace temp review with returned server review (if provided)
         if (res.data) {
-          setReviews((prev) => prev.map((r) => (r.id === tempId ? res.data : r)));
+          setReviews((prev) =>
+            prev.map((r) => (r.id === tempId ? res.data : r))
+          );
         }
       } else {
-        throw new Error(res?.message || res?.error || 'Failed to submit review');
+        throw new Error(
+          res?.message || res?.error || "Failed to submit review"
+        );
       }
     } catch (err) {
       // Revert optimistic update on failure
@@ -212,18 +251,30 @@ const StorePage = () => {
 
   if (!store) {
     return (
-      <div 
-        className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : ''}`}
-        style={!isDarkMode ? {
-          backgroundImage: 'url(/white%20backgroud.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
-        } : {}}
+      <div
+        className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
+          isDarkMode ? "bg-gray-900" : ""
+        }`}
+        style={
+          !isDarkMode
+            ? {
+                backgroundImage: "url(/white%20backgroud.png)",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                backgroundAttachment: "fixed",
+              }
+            : {}
+        }
       >
         <div className="text-center">
-          <h2 className={`text-2xl font-bold mb-4 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>Store not found</h2>
+          <h2
+            className={`text-2xl font-bold mb-4 transition-colors duration-300 ${
+              colors[isDarkMode ? "dark" : "light"].text
+            }`}
+          >
+            Store not found
+          </h2>
           <Link to="/home" className="text-indigo-600 hover:text-indigo-500">
             Back to Home
           </Link>
@@ -243,7 +294,11 @@ const StorePage = () => {
       for (let i = 0; i < count; i++) {
         const r = 8 + (i % 10) * 0.25;
         const a = t * (0.2 + (i % 7) * 0.03) + i;
-        dummy.position.set(Math.cos(a) * r, Math.sin(a * 0.9) * (r * 0.15), -6 - (i % 20) * 0.2);
+        dummy.position.set(
+          Math.cos(a) * r,
+          Math.sin(a * 0.9) * (r * 0.15),
+          -6 - (i % 20) * 0.2
+        );
         dummy.scale.setScalar(0.25 + (i % 5) * 0.04);
         dummy.rotation.set(a * 0.2, a * 0.3, a * 0.1);
         dummy.updateMatrix();
@@ -254,252 +309,571 @@ const StorePage = () => {
     return (
       <instancedMesh ref={meshRef} args={[null, null, count]}>
         <icosahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color={'#66e4ff'} metalness={0.8} roughness={0.2} transparent opacity={0.5} />
+        <meshStandardMaterial
+          color={"#66e4ff"}
+          metalness={0.8}
+          roughness={0.2}
+          transparent
+          opacity={0.5}
+        />
       </instancedMesh>
     );
   }
   return (
     <div
-      className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
+      className={`min-h-screen transition-colors duration-300 ${
+        isDarkMode ? "text-white" : "text-gray-900"
+      }`}
       style={{
-        backgroundImage: isDarkMode ? `url('${nebula}')` : `url('/white%20backgroud.png')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed'
+        backgroundImage: isDarkMode
+          ? `url('${nebula}')`
+          : `url('/white%20backgroud.png')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
       }}
     >
       {/* 3D background */}
       <div className="absolute inset-0 -z-10">
-        <Canvas camera={{ position: [0, 0, 10], fov: 60 }} gl={{ antialias: true }}>
+        <Canvas
+          camera={{ position: [0, 0, 10], fov: 60 }}
+          gl={{ antialias: true }}
+        >
           <ambientLight intensity={0.6} />
-          <pointLight position={[5, 6, 4]} intensity={1.2} color={'#00E5FF'} />
-          <pointLight position={[-6, -4, 3]} intensity={1.0} color={'#FF00FF'} />
+          <pointLight position={[5, 6, 4]} intensity={1.2} color={"#00E5FF"} />
+          <pointLight
+            position={[-6, -4, 3]}
+            intensity={1.0}
+            color={"#FF00FF"}
+          />
           <FloatingInstanced />
         </Canvas>
       </div>
 
       {/* Header */}
-      <div className={`backdrop-blur-md border-b sticky top-0 z-30 transition-colors duration-300 ${
-        isDarkMode 
-          ? 'bg-black/40 border-white/10' 
-          : 'bg-white/80 border-gray-200'
-      }`}>
+      <div
+        className={`backdrop-blur-md border-b sticky top-0 z-30 transition-colors duration-300 ${
+          isDarkMode
+            ? "bg-black/40 border-white/10"
+            : "bg-white/80 border-gray-200"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link to="/home" className={`font-bold text-lg transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>{store?.name || 'Store'}</Link>
+          <Link
+            to="/home"
+            className={`font-bold text-lg transition-colors duration-300 ${
+              colors[isDarkMode ? "dark" : "light"].text
+            }`}
+          >
+            {store?.name || "Store"}
+          </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm">
-            <a href="#featured" className={`hover:text-cyan-300 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>Featured</a>
-            <a href="#products" className={`hover:text-fuchsia-300 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>Products</a>
-            <a href="#reviews" className={`hover:text-cyan-300 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>Reviews</a>
+            <a
+              href="#featured"
+              className={`hover:text-cyan-300 transition-colors duration-300 ${
+                colors[isDarkMode ? "dark" : "light"].textSecondary
+              }`}
+            >
+              Featured
+            </a>
+            <a
+              href="#products"
+              className={`hover:text-fuchsia-300 transition-colors duration-300 ${
+                colors[isDarkMode ? "dark" : "light"].textSecondary
+              }`}
+            >
+              Products
+            </a>
+            <a
+              href="#reviews"
+              className={`hover:text-cyan-300 transition-colors duration-300 ${
+                colors[isDarkMode ? "dark" : "light"].textSecondary
+              }`}
+            >
+              Reviews
+            </a>
           </nav>
           <div className="flex items-center gap-4">
-            <div className={`text-xs sm:text-sm transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>In this store: <span className="font-semibold">{storeCount}</span></div>
-            <Link to="/cart" className={`px-4 py-2 rounded-lg border transition-colors duration-300 ${
-              isDarkMode 
-                ? 'border-cyan-400/40 hover:bg-cyan-400/10' 
-                : 'border-cyan-600/40 hover:bg-cyan-600/10'
-            }`}>Cart</Link>
-                </div>
+            <div
+              className={`text-xs sm:text-sm transition-colors duration-300 ${
+                colors[isDarkMode ? "dark" : "light"].textSecondary
+              }`}
+            >
+              In this store: <span className="font-semibold">{storeCount}</span>
+            </div>
+            <Link
+              to="/cart"
+              className={`px-4 py-2 rounded-lg border transition-colors duration-300 ${
+                isDarkMode
+                  ? "border-cyan-400/40 hover:bg-cyan-400/10"
+                  : "border-cyan-600/40 hover:bg-cyan-600/10"
+              }`}
+            >
+              Cart
+            </Link>
           </div>
         </div>
+      </div>
 
       {/* Hero */}
       <section className="relative pt-16 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl p-6 md:p-10" style={{
-            background: isDarkMode ? 'rgba(10,14,39,0.55)' : 'rgba(255,255,255,0.8)',
-            border: '1px solid rgba(0,229,255,0.3)',
-            boxShadow: '0 0 40px rgba(0,229,255,0.15), inset 0 0 30px rgba(255,0,255,0.08)'
-          }}>
+          <div
+            className="rounded-3xl p-6 md:p-10"
+            style={{
+              background: isDarkMode
+                ? "rgba(10,14,39,0.55)"
+                : "rgba(255,255,255,0.8)",
+              border: "1px solid rgba(0,229,255,0.3)",
+              boxShadow:
+                "0 0 40px rgba(0,229,255,0.15), inset 0 0 30px rgba(255,0,255,0.08)",
+            }}
+          >
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
-                    <img src={store.logo} alt={store.name} className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-4 transition-colors duration-300 ${isDarkMode ? 'border-white/70' : 'border-gray-300'}`} />
+                <img
+                  src={store.logo}
+                  alt={store.name}
+                  className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-4 transition-colors duration-300 ${
+                    isDarkMode ? "border-white/70" : "border-gray-300"
+                  }`}
+                />
                 <div>
-                      <h1 className={`text-3xl md:text-5xl font-extrabold leading-tight transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>{store.name}</h1>
-                      <p className={`mt-1 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{store.description}</p>
-                      <div className={`mt-2 text-sm flex items-center gap-4 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
-                        {store.average_rating && (
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold">{store.average_rating}</span>
-                            <span className={`text-xs ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>({store.total_reviews || 0} reviews)</span>
-                          </div>
-                        )}
+                  <h1
+                    className={`text-3xl md:text-5xl font-extrabold leading-tight transition-colors duration-300 ${
+                      colors[isDarkMode ? "dark" : "light"].text
+                    }`}
+                  >
+                    {store.name}
+                  </h1>
+                  <p
+                    className={`mt-1 transition-colors duration-300 ${
+                      colors[isDarkMode ? "dark" : "light"].textSecondary
+                    }`}
+                  >
+                    {store.description}
+                  </p>
+                  <div
+                    className={`mt-2 text-sm flex items-center gap-4 ${
+                      colors[isDarkMode ? "dark" : "light"].textSecondary
+                    }`}
+                  >
+                    {store.average_rating && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">
+                          {store.average_rating}
+                        </span>
+                        <span
+                          className={`text-xs ${
+                            colors[isDarkMode ? "dark" : "light"].textSecondary
+                          }`}
+                        >
+                          ({store.total_reviews || 0} reviews)
+                        </span>
                       </div>
-                      <div className={`mt-2 text-sm ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>
-                        {store.owner && <span className="mr-4">Owner: <span className="font-medium">{store.owner}</span></span>}
-                        {store.email && <a className="mr-4 text-indigo-500" href={`mailto:${store.email}`}>{store.email}</a>}
-                        {store.telephone && <a className="text-indigo-500" href={`tel:${store.telephone}`}>{store.telephone}</a>}
-                      </div>
-                      <div className="mt-2 flex items-center gap-3">
-                        {store.facebook && <a href={store.facebook} target="_blank" rel="noreferrer" className="text-sm text-blue-600">Facebook</a>}
-                        {store.twitter && <a href={store.twitter} target="_blank" rel="noreferrer" className="text-sm text-sky-500">Twitter</a>}
-                        {store.instagram && <a href={store.instagram} target="_blank" rel="noreferrer" className="text-sm text-pink-500">Instagram</a>}
-                      </div>
+                    )}
+                  </div>
+                  <div
+                    className={`mt-2 text-sm ${
+                      colors[isDarkMode ? "dark" : "light"].textSecondary
+                    }`}
+                  >
+                    {store.owner && (
+                      <span className="mr-4">
+                        Owner:{" "}
+                        <span className="font-medium">{store.owner}</span>
+                      </span>
+                    )}
+                    {store.email && (
+                      <a
+                        className="mr-4 text-indigo-500"
+                        href={`mailto:${store.email}`}
+                      >
+                        {store.email}
+                      </a>
+                    )}
+                    {store.telephone && (
+                      <a
+                        className="text-indigo-500"
+                        href={`tel:${store.telephone}`}
+                      >
+                        {store.telephone}
+                      </a>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-3">
+                    {store.facebook && (
+                      <a
+                        href={store.facebook}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-blue-600"
+                      >
+                        Facebook
+                      </a>
+                    )}
+                    {store.twitter && (
+                      <a
+                        href={store.twitter}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-sky-500"
+                      >
+                        Twitter
+                      </a>
+                    )}
+                    {store.instagram && (
+                      <a
+                        href={store.instagram}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-pink-500"
+                      >
+                        Instagram
+                      </a>
+                    )}
+                  </div>
                 </div>
-          </div>
+              </div>
               <div className="flex-1" />
-          <a href="#products" className="inline-block px-6 py-3 rounded-full font-semibold"
-            style={{ background: 'linear-gradient(90deg,#00E5FF,#FF00FF)', boxShadow: '0 0 24px rgba(0,229,255,0.35)' }}>EXPLORE</a>
+              <a
+                href="#products"
+                className="inline-block px-6 py-3 rounded-full font-semibold"
+                style={{
+                  background: "linear-gradient(90deg,#00E5FF,#FF00FF)",
+                  boxShadow: "0 0 24px rgba(0,229,255,0.35)",
+                }}
+              >
+                EXPLORE
+              </a>
+            </div>
           </div>
         </div>
-      </div>
       </section>
 
       {/* Featured Products */}
       <section id="products" className="pb-20" aria-label="Featured products">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 id="featured" className={`text-2xl md:text-3xl font-bold transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`} style={{ textShadow: isDarkMode ? '0 0 20px rgba(0,229,255,0.4)' : 'none' }}>FEATURED PRODUCTS</h2>
+            <h2
+              id="featured"
+              className={`text-2xl md:text-3xl font-bold transition-colors duration-300 ${
+                colors[isDarkMode ? "dark" : "light"].text
+              }`}
+              style={{
+                textShadow: isDarkMode
+                  ? "0 0 20px rgba(0,229,255,0.4)"
+                  : "none",
+              }}
+            >
+              FEATURED PRODUCTS
+            </h2>
             <button
               onClick={() => setShowWishlistOnly(!showWishlistOnly)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-300 ${
                 showWishlistOnly
-                  ? 'bg-pink-600 text-white'
+                  ? "bg-pink-600 text-white"
                   : isDarkMode
-                  ? 'bg-white/10 text-white hover:bg-white/20'
-                  : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                  ? "bg-white/10 text-white hover:bg-white/20"
+                  : "bg-gray-200 text-gray-900 hover:bg-gray-300"
               }`}
             >
-              {showWishlistOnly ? '❤️ Wishlist' : '🤍 Show Wishlist'}
+              {showWishlistOnly ? "❤️ Wishlist" : "🤍 Show Wishlist"}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {products
-                .filter((product) => !showWishlistOnly || isInWishlist(product.id))
-                .map((product) => {
+            {products
+              .filter(
+                (product) => !showWishlistOnly || isInWishlist(product.id)
+              )
+              .map((product) => {
                 const qty = getQuantityForProduct(product.id, storeId);
                 const inWishlist = isInWishlist(product.id);
                 return (
-                <div key={product.id} className="rounded-2xl overflow-hidden backdrop-blur-sm relative" style={{
-                  background: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)',
-                  border: isDarkMode ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.1)'
-                }}>
-                  {/* Wishlist Icon */}
-                  <button
-                    onClick={() => toggleWishlist(product.id)}
-                    className="absolute top-2 right-2 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-200 hover:scale-110"
+                  <div
+                    key={product.id}
+                    className="rounded-2xl overflow-hidden backdrop-blur-sm relative"
                     style={{
-                      background: inWishlist ? 'rgba(236, 72, 153, 0.9)' : 'rgba(0, 0, 0, 0.3)',
+                      background: isDarkMode
+                        ? "rgba(255,255,255,0.05)"
+                        : "rgba(255,255,255,0.8)",
+                      border: isDarkMode
+                        ? "1px solid rgba(255,255,255,0.18)"
+                        : "1px solid rgba(0,0,0,0.1)",
                     }}
-                    aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
                   >
-                    {inWishlist ? (
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    )}
-                  </button>
-                  
-                  <div className={`h-40 flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-black/30' : 'bg-gray-100'}`}>
-                    <img src={product.image} alt={product.name} className="w-24 h-24 object-contain" />
-                      </div>
-                    <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className={`font-semibold transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>
-                        <RouterLink to={`/product/${product.id}`}>{product.name}</RouterLink>
-                      </h3>
-                      <span className="text-cyan-300 font-bold">{product.priceDisplay ? product.priceDisplay : `$${product.price}`}</span>
-                        </div>
-                    <p className={`text-xs mb-3 line-clamp-2 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{product.description}</p>
-                      <div className="flex items-center justify-between">
-                          <button
-                            onClick={() => handleAddToCart(product)}
-                            disabled={!product.inStock}
-                        className={`px-3 py-2 rounded-lg text-sm ${product.inStock ? 'bg-cyan-600 hover:bg-cyan-500' : 'bg-gray-600 cursor-not-allowed'}`}
-                        aria-label={product.inStock ? `Add ${product.name} to cart` : `${product.name} out of stock`}
-                          >
-                            {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-                          </button>
-                      {qty > 0 && (
-                        <span className={`text-xs transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>In cart: {qty}</span>
+                    {/* Wishlist Icon */}
+                    <button
+                      onClick={() => toggleWishlist(product.id)}
+                      className="absolute top-2 right-2 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-200 hover:scale-110"
+                      style={{
+                        background: inWishlist
+                          ? "rgba(236, 72, 153, 0.9)"
+                          : "rgba(0, 0, 0, 0.3)",
+                      }}
+                      aria-label={
+                        inWishlist ? "Remove from wishlist" : "Add to wishlist"
+                      }
+                    >
+                      {inWishlist ? (
+                        <svg
+                          className="w-5 h-5 text-white"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-5 h-5 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                          />
+                        </svg>
                       )}
+                    </button>
+
+                    <div
+                      className={`h-40 flex items-center justify-center transition-colors duration-300 ${
+                        isDarkMode ? "bg-black/30" : "bg-gray-100"
+                      }`}
+                    >
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="w-24 h-24 object-contain"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3
+                          className={`font-semibold transition-colors duration-300 ${
+                            colors[isDarkMode ? "dark" : "light"].text
+                          }`}
+                        >
+                          <RouterLink to={`/product/${product.id}`}>
+                            {product.name}
+                          </RouterLink>
+                        </h3>
+                        <span className="text-cyan-300 font-bold">
+                          {product.priceDisplay
+                            ? product.priceDisplay
+                            : `$${product.price}`}
+                        </span>
+                      </div>
+                      <p
+                        className={`text-xs mb-3 line-clamp-2 transition-colors duration-300 ${
+                          colors[isDarkMode ? "dark" : "light"].textSecondary
+                        }`}
+                      >
+                        {product.description}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          disabled={!product.inStock}
+                          className={`px-3 py-2 rounded-lg text-sm ${
+                            product.inStock
+                              ? "bg-cyan-600 hover:bg-cyan-500"
+                              : "bg-gray-600 cursor-not-allowed"
+                          }`}
+                          aria-label={
+                            product.inStock
+                              ? `Add ${product.name} to cart`
+                              : `${product.name} out of stock`
+                          }
+                        >
+                          {product.inStock ? "Add to Cart" : "Out of Stock"}
+                        </button>
+                        {qty > 0 && (
+                          <span
+                            className={`text-xs transition-colors duration-300 ${
+                              colors[isDarkMode ? "dark" : "light"]
+                                .textSecondary
+                            }`}
+                          >
+                            In cart: {qty}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                 );
               })}
-            </div>
           </div>
+        </div>
       </section>
 
       {/* Reviews */}
       <section id="reviews" className="pb-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className={`text-2xl md:text-3xl font-bold mb-6 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>REVIEWS ({reviews.length})</h2>
-            {user && (
-              <div className="mb-8">
-              <button onClick={() => setShowReviewForm(!showReviewForm)} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 py-2 rounded-md">
-                  {showReviewForm ? 'Cancel' : 'Write a Review'}
-                </button>
-                {showReviewForm && (
-                <form onSubmit={handleSubmitReview} className={`mt-4 rounded-2xl p-6 backdrop-blur-sm transition-colors duration-300 ${
-                  isDarkMode 
-                    ? 'bg-white/6 border border-white/15' 
-                    : 'bg-white/80 border border-gray-200'
-                }`}>
-                    <div className="mb-4">
-                    <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>Rating</label>
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                        <button key={i} type="button" onClick={() => setNewReview({ ...newReview, rating: i + 1 })} className={`w-8 h-8 ${i < newReview.rating ? 'text-yellow-400' : isDarkMode ? 'text-white/30' : 'text-gray-300'}`}>
-                          <svg fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                          </button>
-                        ))}
-                      </div>
+          <h2
+            className={`text-2xl md:text-3xl font-bold mb-6 transition-colors duration-300 ${
+              colors[isDarkMode ? "dark" : "light"].text
+            }`}
+          >
+            REVIEWS ({reviews.length})
+          </h2>
+          {user && (
+            <div className="mb-8">
+              <button
+                onClick={() => setShowReviewForm(!showReviewForm)}
+                className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 py-2 rounded-md"
+              >
+                {showReviewForm ? "Cancel" : "Write a Review"}
+              </button>
+              {showReviewForm && (
+                <form
+                  onSubmit={handleSubmitReview}
+                  className={`mt-4 rounded-2xl p-6 backdrop-blur-sm transition-colors duration-300 ${
+                    isDarkMode
+                      ? "bg-white/6 border border-white/15"
+                      : "bg-white/80 border border-gray-200"
+                  }`}
+                >
+                  <div className="mb-4">
+                    <label
+                      className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                        colors[isDarkMode ? "dark" : "light"].text
+                      }`}
+                    >
+                      Rating
+                    </label>
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() =>
+                            setNewReview({ ...newReview, rating: i + 1 })
+                          }
+                          className={`w-8 h-8 ${
+                            i < newReview.rating
+                              ? "text-yellow-400"
+                              : isDarkMode
+                              ? "text-white/30"
+                              : "text-gray-300"
+                          }`}
+                        >
+                          <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </button>
+                      ))}
                     </div>
-                    <div className="mb-4">
-                    <label className={`block text-sm font-medium mb-2 transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>Comment</label>
+                  </div>
+                  <div className="mb-4">
+                    <label
+                      className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                        colors[isDarkMode ? "dark" : "light"].text
+                      }`}
+                    >
+                      Comment
+                    </label>
                     <textarea
                       value={newReview.comment}
-                      onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                      className={`w-full px-3 py-2 rounded-md transition-colors duration-200 ${isDarkMode ? 'bg-gray-800/60 placeholder-gray-300' : 'bg-white placeholder-gray-500'} ${colors[isDarkMode ? 'dark' : 'light'].text}`}
+                      onChange={(e) =>
+                        setNewReview({ ...newReview, comment: e.target.value })
+                      }
+                      className={`w-full px-3 py-2 rounded-md transition-colors duration-200 ${
+                        isDarkMode
+                          ? "bg-gray-800/60 placeholder-gray-300"
+                          : "bg-white placeholder-gray-500"
+                      } ${colors[isDarkMode ? "dark" : "light"].text}`}
                       rows={4}
                       placeholder="Share your experience with this store..."
                       required
                     />
+                  </div>
+                  <button
+                    type="submit"
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-md"
+                  >
+                    Submit Review
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+          <div className="space-y-6">
+            {reviews.map((review) => (
+              <div
+                key={review.id}
+                className={`rounded-2xl p-6 backdrop-blur-sm transition-colors duration-300 ${
+                  isDarkMode
+                    ? "bg-white/6 border border-white/15"
+                    : "bg-white/80 border border-gray-200"
+                }`}
+              >
+                <div className="flex items-start">
+                  <img
+                    src={review.userAvatar}
+                    alt={review.userName}
+                    className="w-10 h-10 rounded-full mr-4"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4
+                        className={`font-medium transition-colors duration-300 ${
+                          colors[isDarkMode ? "dark" : "light"].text
+                        }`}
+                      >
+                        {review.userName}
+                      </h4>
+                      <span
+                        className={`text-sm transition-colors duration-300 ${
+                          colors[isDarkMode ? "dark" : "light"].textSecondary
+                        }`}
+                      >
+                        {review.date}
+                      </span>
                     </div>
-                  <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-md">Submit Review</button>
-                  </form>
-                )}
-              </div>
-            )}
-            <div className="space-y-6">
-              {reviews.map((review) => (
-              <div key={review.id} className={`rounded-2xl p-6 backdrop-blur-sm transition-colors duration-300 ${
-                isDarkMode 
-                  ? 'bg-white/6 border border-white/15' 
-                  : 'bg-white/80 border border-gray-200'
-              }`}>
-                  <div className="flex items-start">
-                  <img src={review.userAvatar} alt={review.userName} className="w-10 h-10 rounded-full mr-4" />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                      <h4 className={`font-medium transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].text}`}>{review.userName}</h4>
-                      <span className={`text-sm transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{review.date}</span>
-                      </div>
-                      <div className="flex items-center mb-2">
-                        {[...Array(5)].map((_, i) => (
-                        <svg key={i} className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400' : isDarkMode ? 'text-white/30' : 'text-gray-300'}`} fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                    <p className={`transition-colors duration-300 ${colors[isDarkMode ? 'dark' : 'light'].textSecondary}`}>{review.comment}</p>
+                    <div className="flex items-center mb-2">
+                      {[...Array(5)].map((_, i) => (
+                        <svg
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i < review.rating
+                              ? "text-yellow-400"
+                              : isDarkMode
+                              ? "text-white/30"
+                              : "text-gray-300"
+                          }`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
                     </div>
+                    <p
+                      className={`transition-colors duration-300 ${
+                        colors[isDarkMode ? "dark" : "light"].textSecondary
+                      }`}
+                    >
+                      {review.comment}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
+        </div>
       </section>
     </div>
   );
 };
 
 export default StorePage;
-
-

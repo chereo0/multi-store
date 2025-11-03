@@ -120,9 +120,10 @@ api.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      
+
       // Silently ignore OAuth2 token endpoint errors (password grant not supported)
-      const urlString = typeof error.config?.url === "string" ? error.config.url : "";
+      const urlString =
+        typeof error.config?.url === "string" ? error.config.url : "";
       if (urlString.includes("/oauth2/token")) {
         // Don't log or show toast for OAuth2 errors - backend doesn't support password grant
         return Promise.reject(error);
