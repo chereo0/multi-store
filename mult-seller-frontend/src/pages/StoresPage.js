@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { getHomePageBuilder } from "../api/services";
 
@@ -7,6 +7,12 @@ const StoresPage = () => {
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const { isDarkMode } = useTheme();
+  const location = useLocation();
+
+  const searchQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return (params.get("q") || "").trim().toLowerCase();
+  }, [location.search]);
 
   useEffect(() => {
     const fetchStoresFromHomeBuilder = async () => {
@@ -42,6 +48,20 @@ const StoresPage = () => {
     fetchStoresFromHomeBuilder();
   }, []);
 
+  const filteredStores = useMemo(() => {
+    if (!searchQuery) return stores;
+    return (stores || []).filter((store) => {
+      const name = (store?.name || "").toLowerCase();
+      const desc = (store?.description || "").toLowerCase();
+      const slug = (store?.slug || "").toLowerCase();
+      return (
+        name.includes(searchQuery) ||
+        desc.includes(searchQuery) ||
+        slug.includes(searchQuery)
+      );
+    });
+  }, [stores, searchQuery]);
+
   return (
     <div
       className={`min-h-screen transition-colors duration-300 ${
@@ -59,8 +79,7 @@ const StoresPage = () => {
           : {}
       }
     >
-      {/* Spacer for fixed navbar */}
-      <div className="h-16"></div>
+  {/* Spacer removed; global padding added in App.js */}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
@@ -104,8 +123,8 @@ const StoresPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {stores.length > 0 ? (
-              stores.map((store, idx) => {
+            {filteredStores.length > 0 ? (
+              filteredStores.map((store, idx) => {
                 const storeId =
                   store.id ??
                   store.store_id ??
@@ -202,14 +221,16 @@ const StoresPage = () => {
                       isDarkMode ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    No Stores Available
+                    {searchQuery ? "No matching stores" : "No Stores Available"}
                   </h3>
                   <p
                     className={`transition-colors duration-300 ${
                       isDarkMode ? "text-gray-300" : "text-gray-600"
                     }`}
                   >
-                    Check back later for new stores in the multiverse!
+                    {searchQuery
+                      ? "Try a different search keyword."
+                      : "Check back later for new stores in the multiverse!"}
                   </p>
                 </div>
               </div>

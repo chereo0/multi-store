@@ -576,6 +576,22 @@ const AuthPage = () => {
                 >
                   {loading ? "Creating account..." : "CREATE ACCOUNT"}
                 </button>
+
+                {/* Login button placed below signup with spacing */}
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/auth?tab=login')}
+                    className="w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 border bg-transparent hover:scale-[1.01]"
+                    style={{
+                      borderColor: isDarkMode ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.15)",
+                      color: isDarkMode ? "#E5E7EB" : "#374151",
+                      background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
+                    }}
+                  >
+                    Already have an account? Login
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -600,6 +616,18 @@ const AuthPage = () => {
           {/* Guest Continue */}
 
           <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={handleGuestContinue}
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:scale-[1.02]"
+              style={{
+                border: isDarkMode ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(0,0,0,0.15)",
+                color: isDarkMode ? "#E5E7EB" : "#374151",
+                background: isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
+              }}
+            >
+              Continue as Guest
+            </button>
             <p className="mt-4 text-xs text-[#B0B8C1]">
               By continuing you agree to our Terms of Service and Privacy
               Policy.

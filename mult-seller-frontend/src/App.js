@@ -35,7 +35,7 @@ import { useInitialApiCall } from "./hooks/useApiCall";
 const AnimatedRoutes = () => {
   const location = useLocation();
   return (
-    <div className="transition-all duration-300">
+    <div className="transition-all duration-300 pt-16">
       <Routes location={location} key={location.pathname}>
         <Route path="/home" element={<Homepage />} />
         <Route path="/about" element={<AboutPage />} />

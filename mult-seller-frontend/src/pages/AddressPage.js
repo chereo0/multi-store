@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -8,6 +8,7 @@ import {
   getUserAddresses,
 } from "../api/services";
 import toast from "react-hot-toast";
+import LocationPicker from "../components/LocationPicker";
 import { deleteAddress } from "../api/services";
 
 const AddressPage = () => {
@@ -19,6 +20,9 @@ const AddressPage = () => {
   const [addressId, setAddressId] = useState(null);
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
+  // Two-step flow control: 'pick' -> choose location on map, then 'form' -> fill details
+  const [flowStep, setFlowStep] = useState("form");
+  const locationStepRef = useRef(null);
   const [addressData, setAddressData] = useState({
     firstname: user?.firstname || "",
     lastname: user?.lastname || "",
@@ -28,6 +32,8 @@ const AddressPage = () => {
     postcode: "",
     country: "Lebanon",
     phone: user?.telephone || "",
+    latitude: null,
+    longitude: null,
   });
 
   // Load addresses on component mount
@@ -111,6 +117,10 @@ const AddressPage = () => {
               postcode: firstAddress.postcode || "",
               country: firstAddress.country || "Lebanon",
               phone: firstAddress.phone || user?.telephone || "",
+              latitude:
+                firstAddress.latitude ?? firstAddress.lat ?? firstAddress.geo_lat ?? null,
+              longitude:
+                firstAddress.longitude ?? firstAddress.lng ?? firstAddress.geo_lng ?? null,
             });
           }
         } else {
@@ -156,13 +166,17 @@ const AddressPage = () => {
       postcode: address.postcode || "",
       country: address.country || "Lebanon",
       phone: address.phone || user?.telephone || "",
+      latitude: address.latitude ?? address.lat ?? address.geo_lat ?? null,
+      longitude: address.longitude ?? address.lng ?? address.geo_lng ?? null,
     });
     setIsEditing(false);
+    setFlowStep("form");
   };
 
   // Prepare form for creating a new address
   const handleAddNewAddress = () => {
     setIsEditing(true);
+    setFlowStep("pick");
     setAddressId(null);
     setSelectedAddressId(null);
     setAddressData({
@@ -174,7 +188,15 @@ const AddressPage = () => {
       postcode: "",
       country: "Lebanon",
       phone: user?.telephone || "",
+      latitude: null,
+      longitude: null,
     });
+    // Smooth scroll to the location picker step
+    setTimeout(() => {
+      if (locationStepRef.current) {
+        locationStepRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 50);
   };
 
   const handleInputChange = (e) => {
@@ -218,6 +240,7 @@ const AddressPage = () => {
           },
         });
         setIsEditing(false);
+        setFlowStep("form");
 
         // Reload addresses to reflect changes
         const reloadResult = await getUserAddresses();
@@ -229,11 +252,25 @@ const AddressPage = () => {
         }
       } else {
         console.error("Save failed:", result);
-        toast.error(result.message || "Failed to save address");
+        const msg = String(result.message || "Failed to save address");
+        if (msg.includes("Unknown column 'country_id'")) {
+          toast.error(
+            "Address service temporarily unavailable: backend DB missing column country_id. We've notified the team."
+          );
+        } else {
+          toast.error(msg);
+        }
       }
     } catch (error) {
       console.error("Error saving address:", error);
-      toast.error("An error occurred while saving the address");
+      const msg = String(error?.message || "An error occurred while saving the address");
+      if (msg.includes("Unknown column 'country_id'")) {
+        toast.error(
+          "Address service temporarily unavailable: backend DB missing column country_id. We've notified the team."
+        );
+      } else {
+        toast.error("An error occurred while saving the address");
+      }
     } finally {
       setSaving(false);
     }
@@ -250,8 +287,11 @@ const AddressPage = () => {
       postcode: "",
       country: "Lebanon",
       phone: user?.telephone || "",
+      latitude: null,
+      longitude: null,
     });
     setIsEditing(false);
+    setFlowStep("form");
   };
 
   // Delete selected address
@@ -355,7 +395,8 @@ const AddressPage = () => {
   };
 
   // Delete address by id (used for per-card delete button)
-  const handleDeleteAddressById = async (id) => {
+  const handleDeleteAddressById = async (idOrAddress) => {
+    const id = extractAddressId(idOrAddress);
     if (!id) {
       toast.error("Invalid address id");
       return;
@@ -368,7 +409,7 @@ const AddressPage = () => {
 
     try {
       setSaving(true);
-      const result = await deleteAddress(id);
+  const result = await deleteAddress(id);
       if (result.success) {
         toast.success("Address deleted");
         // Reload addresses
@@ -474,8 +515,7 @@ const AddressPage = () => {
           : {}
       }
     >
-      {/* Spacer for fixed navbar */}
-      <div className="h-16"></div>
+  {/* Global top padding handled in App.js */}
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -735,6 +775,76 @@ const AddressPage = () => {
           </div>
 
           {/* Address Form */}
+          {/* Step 1: Pick location for new address */}
+          {isEditing && !addressId && flowStep === "pick" && (
+            <div
+              ref={locationStepRef}
+              className={`mb-8 p-6 rounded-lg transition-all duration-300 ${
+                isDarkMode
+                  ? "bg-gray-800/50 border border-gray-700"
+                  : "bg-white/50 border border-gray-200"
+              }`}
+            >
+              <h3
+                className={`text-xl font-semibold mb-2 ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Step 1 of 2: Choose Location
+              </h3>
+              <p className={`${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-4`}>
+                Tap on the map to drop a pin or use the "Use my location" button. You can adjust it before continuing.
+              </p>
+              <LocationPicker
+                value={{ lat: addressData.latitude, lng: addressData.longitude }}
+                onChange={(pos) =>
+                  setAddressData((prev) => ({
+                    ...prev,
+                    latitude: pos.lat,
+                    longitude: pos.lng,
+                  }))
+                }
+                isDark={isDarkMode}
+                disabled={false}
+                height={360}
+              />
+              <div className="flex justify-center gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    if (addressData.latitude == null || addressData.longitude == null) {
+                      toast.error("Please choose a location before continuing.");
+                      return;
+                    }
+                    setFlowStep("form");
+                    // scroll to top of form after switching step
+                    setTimeout(() => {
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }, 50);
+                  }}
+                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
+                    isDarkMode
+                      ? "bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25"
+                      : "bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg"
+                  }`}
+                >
+                  Continue to Form
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
+                    isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+                      : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                  }`}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Details form */}
+          {!(isEditing && !addressId && flowStep === "pick") && (
           <form className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -956,69 +1066,163 @@ const AddressPage = () => {
                 />
               </div>
             </div>
-          </form>
 
-          {/* Action Buttons */}
-          <div className="flex justify-center space-x-4 mt-8">
-            {!isEditing ? (
-              <button
-                onClick={() => setIsEditing(true)}
-                className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
-                  isDarkMode
-                    ? "bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25"
-                    : "bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg"
+            {/* Location section */}
+            <div>
+              <label
+                className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
-                Edit Address
-              </button>
-            ) : (
-              <>
+                Location (optional)
+              </label>
+              <div className="space-y-3">
+                <LocationPicker
+                  value={{ lat: addressData.latitude, lng: addressData.longitude }}
+                  onChange={(pos) =>
+                    setAddressData((prev) => ({
+                      ...prev,
+                      latitude: pos.lat,
+                      longitude: pos.lng,
+                    }))
+                  }
+                  isDark={isDarkMode}
+                  disabled={!isEditing}
+                  height={320}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      htmlFor="latitude"
+                      className={`block text-xs font-medium mb-1 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      Latitude
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      id="latitude"
+                      name="latitude"
+                      value={addressData.latitude ?? ""}
+                      onChange={(e) =>
+                        setAddressData((prev) => ({
+                          ...prev,
+                          latitude: e.target.value === "" ? null : Number(e.target.value),
+                        }))
+                      }
+                      disabled={!isEditing}
+                      className={`w-full px-3 py-2 rounded-lg ${
+                        isDarkMode
+                          ? "bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400"
+                          : "bg-white border border-gray-300 text-gray-900 placeholder-gray-500"
+                      }`}
+                      placeholder="e.g. 33.8938"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="longitude"
+                      className={`block text-xs font-medium mb-1 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
+                      }`}
+                    >
+                      Longitude
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      id="longitude"
+                      name="longitude"
+                      value={addressData.longitude ?? ""}
+                      onChange={(e) =>
+                        setAddressData((prev) => ({
+                          ...prev,
+                          longitude: e.target.value === "" ? null : Number(e.target.value),
+                        }))
+                      }
+                      disabled={!isEditing}
+                      className={`w-full px-3 py-2 rounded-lg ${
+                        isDarkMode
+                          ? "bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400"
+                          : "bg-white border border-gray-300 text-gray-900 placeholder-gray-500"
+                      }`}
+                      placeholder="e.g. 35.5018"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+          )}
+
+          {/* Action Buttons */}
+          {!(isEditing && !addressId && flowStep === "pick") && (
+            <div className="flex justify-center space-x-4 mt-8">
+              {!isEditing ? (
                 <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isDarkMode
-                      ? "bg-gradient-to-r from-green-400 to-green-500 text-white shadow-lg shadow-green-400/25"
-                      : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg"
-                  }`}
-                >
-                  {saving ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Saving...</span>
-                    </div>
-                  ) : (
-                    "Save Address"
-                  )}
-                </button>
-                <button
-                  onClick={handleCancel}
+                  onClick={() => {
+                    setIsEditing(true);
+                    setFlowStep("form");
+                  }}
                   className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
                     isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
-                      : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                      ? "bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25"
+                      : "bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg"
                   }`}
                 >
-                  Cancel
+                  Edit Address
                 </button>
-                {/* Delete button available while editing or when an address is selected */}
-                <button
-                  onClick={handleDeleteAddress}
-                  disabled={!selectedAddressId || saving}
-                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isDarkMode
-                      ? "bg-red-600 hover:bg-red-500 text-white"
-                      : "bg-red-500 hover:bg-red-400 text-white"
-                  }`}
-                >
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
+              ) : (
+                <>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDarkMode
+                        ? "bg-gradient-to-r from-green-400 to-green-500 text-white shadow-lg shadow-green-400/25"
+                        : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg"
+                    }`}
+                  >
+                    {saving ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Saving...</span>
+                      </div>
+                    ) : (
+                      "Save Address"
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCancel}
+                    className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
+                      isDarkMode
+                        ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+                        : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  {/* Delete button available while editing or when an address is selected */}
+                  <button
+                    onClick={handleDeleteAddress}
+                    disabled={!selectedAddressId || saving}
+                    className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDarkMode
+                        ? "bg-red-600 hover:bg-red-500 text-white"
+                        : "bg-red-500 hover:bg-red-400 text-white"
+                    }`}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Address Summary */}
-          {addressData.address_1 && (
+          {!(isEditing && !addressId && flowStep === "pick") && addressData.address_1 && (
             <div
               className={`mt-8 p-6 rounded-lg transition-all duration-300 ${
                 isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
@@ -1060,6 +1264,11 @@ const AddressPage = () => {
                 <p>
                   <strong>Phone:</strong> +961{addressData.phone}
                 </p>
+                {addressData.latitude != null && addressData.longitude != null && (
+                  <p>
+                    <strong>Location:</strong> {addressData.latitude}, {addressData.longitude}
+                  </p>
+                )}
               </div>
             </div>
           )}

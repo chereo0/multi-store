@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useCart } from "../../context/CartContext";
+// import { useCart } from "../../context/CartContext";
 import { useTheme } from "../../context/ThemeContext";
-import ThreeScene from "../../components/ThreeScene";
+// import ThreeScene from "../../components/ThreeScene";
+import HeroSlideshow from "../../components/HeroSlideshow";
 import { getStores, getHomePageBuilder } from "../../api/services";
 
 // Helper function to get icon for category
@@ -31,7 +32,7 @@ const Homepage = () => {
   const [banners, setBanners] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
   const { user } = useAuth();
-  const { getCartItemsCount } = useCart();
+  // const { getCartItemsCount } = useCart();
   const { isDarkMode, colors } = useTheme();
 
   useEffect(() => {
@@ -147,63 +148,37 @@ const Homepage = () => {
       className={`min-h-screen transition-colors duration-300 ${
         isDarkMode ? "bg-gray-900" : ""
       }`}
-      style={
-        !isDarkMode
-          ? {
-              backgroundImage: "url(/white%20backgroud.png)",
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              backgroundAttachment: "fixed",
-            }
-          : {}
-      }
+      style={{}}
     >
-      {/* Spacer for fixed navbar */}
-      <div className="h-16"></div>
+  {/* Global top padding now handled in App.js */}
 
-      {/* Hero Section - Cosmic Background */}
+      {/* Hero Section - 3D Slideshow (no background) */}
       <section
         id="home"
-        className={`min-h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-300 ${
-          isDarkMode
-            ? "bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900"
-            : "bg-gradient-to-br from-white via-blue-50 to-purple-50"
-        }`}
-        style={{
-          // Use white background image in light mode, dark cosmic background in dark mode
-          backgroundImage: isDarkMode
-            ? `linear-gradient(rgba(10,14,39,0.6), rgba(10,14,39,0.75)), url(/landing-bg.jpg), url(/Gemini_Generated_Image_enzgvmenzgvmenzg.png), url(/Gemini_Generated_Image_pc6crxpc6crxpc6c.png)`
-            : `url(/white%20backgroud.png)`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
+        className={`relative overflow-hidden w-full`}
+        style={{}}
       >
-        {/* React Three Fiber 3D Background */}
-        <ThreeScene formInteraction={0} />
-
-        {/* Cosmic Grid Pattern */}
-        <div
-          className={`absolute inset-0 transition-opacity duration-300 ${
-            isDarkMode ? "opacity-20" : "opacity-10"
-          }`}
-        >
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `
-              linear-gradient(rgba(0, 229, 255, 0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(0, 229, 255, 0.1) 1px, transparent 1px)
-            `,
-              backgroundSize: "50px 50px",
-              transform: "perspective(1000px) rotateX(60deg)",
-              transformOrigin: "center bottom",
-            }}
-          ></div>
+        {/* Build slideshow images from banners or fallback images */}
+        <div className="w-full relative z-10">
+          {(() => {
+            const heroImages = Array.isArray(banners)
+              ? banners
+                  .map((b) =>
+                    b?.image || b?.banner || b?.url || b?.src || b?.background_image
+                  )
+                  .filter(Boolean)
+              : [];
+            const fallback = [
+              "/landing-bg.jpg",
+              "/Gemini_Generated_Image_enzgvmenzgvmenzg.png",
+              "/Gemini_Generated_Image_pc6crxpc6crxpc6c.png",
+            ];
+            const slides = heroImages.length ? heroImages : fallback;
+            return <HeroSlideshow images={slides} height="100vh" />;
+          })()}
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 mt-10">
           <div
             className={`transform transition-all duration-1000 ${
               isVisible
