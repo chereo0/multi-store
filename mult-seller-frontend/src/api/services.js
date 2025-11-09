@@ -218,6 +218,25 @@ export const getStores = async () => {
   return { success: true, data: mockStores };
 };
 
+/**
+ * Send contact form data to backend
+ * POST /contact
+ * @param {object} payload { name, email, subject, message }
+ */
+export const sendContact = async (payload) => {
+  try {
+  const response = await api.post("/contact", payload);
+    // Normalize response
+    if (response && (response.status === 200 || response.status === 201)) {
+      return { success: true, data: response.data };
+    }
+    return { success: false, error: response?.data || "Unknown response" };
+  } catch (e) {
+    const err = e?.response?.data?.message || e?.message || "Request failed";
+    return { success: false, error: err };
+  }
+};
+
 export const getCategoryBySlug = async (slug) => {
   await new Promise((resolve) => setTimeout(resolve, 200));
   const category = mockCategories.find((c) => c.slug === String(slug));
@@ -225,7 +244,68 @@ export const getCategoryBySlug = async (slug) => {
 };
 
 export const getStoresByCategory = async (categoryIdOrSlug) => {
-  // Accept id or slug for convenience
+  // Try real API first: GET /getstoresbycategoryid/:id
+  try {
+    const id = String(categoryIdOrSlug);
+    const res = await api.get(`/getstoresbycategoryid/${encodeURIComponent(id)}`);
+    if (res && res.data) {
+      const payload = res.data;
+      // Normalize different API shapes. Prefer payload.data.stores when present.
+      const dataArray =
+        (payload.data && Array.isArray(payload.data.stores) && payload.data.stores) ||
+        (Array.isArray(payload.stores) && payload.stores) ||
+        (Array.isArray(payload.data) && payload.data) ||
+        (Array.isArray(payload) && payload) ||
+        [];
+      const ok = payload.success === 1 || payload.success === true || dataArray.length >= 0;
+      // Map incoming store objects to a consistent shape used by the UI
+      const mapped = (Array.isArray(dataArray) ? dataArray : []).map((s) => ({
+        id: s.id ?? s.store_id ?? s.storeId ?? s._id ?? s.slug ?? null,
+        name: s.name ?? s.store_name ?? s.title ?? "",
+        description: s.description ?? s.desc ?? s.summary ?? "",
+        logo: s.profile_image ?? s.logo ?? s.avatar ?? null,
+        banner: s.background_image ?? s.banner ?? null,
+        rating: s.average_rating ? Number(s.average_rating) : s.rating ?? null,
+        reviewCount: s.total_reviews ? Number(s.total_reviews) : s.reviewCount ?? 0,
+        category: s.category ?? s.category_id ?? null,
+        raw: s,
+      }));
+
+      if (Array.isArray(mapped) && mapped.length === 0) {
+        // try to find mock fallback
+        let mockCat = null;
+        if (typeof categoryIdOrSlug === "number" || /^[0-9]+$/.test(String(categoryIdOrSlug))) {
+          mockCat = mockCategories.find((c) => c.id === Number(categoryIdOrSlug));
+        } else {
+          mockCat = mockCategories.find((c) => c.slug === String(categoryIdOrSlug));
+        }
+        if (mockCat) {
+          const fallbackStores = mockStores.filter((s) => s.category === mockCat.name);
+          if (fallbackStores && fallbackStores.length > 0) {
+            // map fallback stores to same shape
+            const fb = fallbackStores.map((s) => ({
+              id: s.id,
+              name: s.name,
+              description: s.description,
+              logo: s.logo,
+              banner: s.banner,
+              rating: s.rating,
+              reviewCount: s.reviewCount || 0,
+              category: s.category,
+              raw: s,
+            }));
+            return { success: true, data: fb };
+          }
+        }
+      }
+      return { success: !!ok, data: mapped };
+    }
+  } catch (err) {
+    // If the API call fails (404, CORS, etc.) we'll fallback to mock data below
+    console.warn("getStoresByCategory API failed, falling back to mock:", err?.message || err);
+  }
+
+  // Accept id or slug for convenience (local mock fallback)
   await new Promise((resolve) => setTimeout(resolve, 500));
   let category = null;
   if (
