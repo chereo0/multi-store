@@ -279,16 +279,7 @@ const Navbar = () => {
                 >
                   Login
                 </Link>
-                <Link
-                  to="/signup"
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105 ${
-                    isDarkMode
-                      ? "bg-gradient-to-r from-cyan-400 to-purple-500 text-white"
-                      : "bg-gradient-to-r from-cyan-500 to-purple-600 text-white"
-                  }`}
-                >
-                  Sign Up
-                </Link>
+                {/* Sign Up removed per request - only Login is shown */}
               </div>
             )}
 
@@ -436,17 +427,7 @@ const Navbar = () => {
                     >
                       Login
                     </Link>
-                    <Link
-                      to="/signup"
-                      className={`block px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                        isDarkMode
-                          ? "bg-gradient-to-r from-cyan-400 to-purple-500 text-white"
-                          : "bg-gradient-to-r from-cyan-500 to-purple-600 text-white"
-                      }`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Sign Up
-                    </Link>
+                    {/* Sign Up removed from mobile menu per request */}
                   </div>
                 )}
               </div>
