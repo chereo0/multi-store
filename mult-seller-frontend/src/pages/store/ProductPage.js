@@ -86,7 +86,7 @@ const ProductPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div>
             <div className="relative rounded-xl overflow-hidden shadow">
-              <img src={product.image} alt={product.name} className="w-full h-96 object-cover" />
+              <img src={product.image || product.image_url || product.picture || product.raw?.image || '/no-image.png'} alt={product.name} className="w-full h-96 object-cover" />
               {quantityInCart > 0 && (
                 <div className="absolute top-3 right-3 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow">
                   In cart: {quantityInCart}

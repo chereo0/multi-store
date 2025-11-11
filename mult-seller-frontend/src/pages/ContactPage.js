@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import toast from 'react-hot-toast';
+import { sendContact } from '../api/services';
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -22,13 +24,28 @@ const ContactPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    setTimeout(() => {
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message,
+      };
+
+      const result = await sendContact(payload);
+      if (result.success) {
+        setIsSubmitted(true);
+        setFormData({ name: '', email: '', subject: '', message: '' });
+        toast.success('Message sent! We will contact you soon.');
+      } else {
+        toast.error(result.error || 'Failed to send message.');
+      }
+    } catch (err) {
+      console.error('Contact submit error:', err);
+      toast.error('An error occurred while sending your message.');
+    } finally {
       setIsSubmitting(false);
-      setIsSubmitted(true);
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 2000);
+    }
   };
 
   return (

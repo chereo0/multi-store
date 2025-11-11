@@ -1,19 +1,29 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { getProduct, getProductReviews } from '../../api/services';
 import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+
+// Basic HTML sanitizer (remove script tags & inline event handlers). For stronger
+// security consider adding DOMPurify; this keeps dependencies minimal.
+function sanitizeHTML(html) {
+  if (!html) return '';
+  return String(html)
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '');
+}
 
 const ProductPage = () => {
   const { productId } = useParams();
+  const location = useLocation();
   const [product, setProduct] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('reviews'); // reviews first by default
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const { addToCart } = useCart();
-  const { user } = useAuth();
 
   useEffect(() => {
     const load = async () => {
@@ -22,7 +32,15 @@ const ProductPage = () => {
           getProduct(productId),
           getProductReviews(productId)
         ]);
-        if (p.success) setProduct(p.data);
+        if (p.success) {
+          setProduct(p.data);
+          // Initialize gallery selected image
+          if (p.data?.images && p.data.images.length > 0) {
+            setSelectedImage(p.data.images[0]);
+          } else if (p.data?.image) {
+            setSelectedImage(p.data.image);
+          }
+        }
         if (r.success) setReviews(r.data);
       } catch (e) {
         console.error(e);
@@ -40,6 +58,10 @@ const ProductPage = () => {
     addToCart(product, product.storeId || fallbackStoreId, 1);
     toast.success(`${product.name} added to cart`);
   };
+
+  const handleThumbClick = useCallback((img) => {
+    setSelectedImage(img);
+  }, []);
 
   if (loading) {
     return (
@@ -76,8 +98,34 @@ const ProductPage = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <img src={product.image} alt={product.name} className="w-full h-96 object-cover" />
+          <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+            <div className="relative w-full h-96 bg-black">
+              <img
+                src={selectedImage || product.image || '/no-image.png'}
+                alt={product.name}
+                className="w-full h-96 object-contain mix-blend-screen"
+                onError={(e)=>{e.currentTarget.src='/no-image.png'}}
+              />
+              {product.stock_status && (
+                <span className={`absolute top-4 left-4 px-3 py-1 text-xs font-semibold rounded-full shadow ${product.inStock ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                  {product.stock_status}
+                </span>
+              )}
+            </div>
+            {product.images && product.images.length > 1 && (
+              <div className="p-4 grid grid-cols-5 gap-3">
+                {product.images.slice(0,10).map((img) => (
+                  <button
+                    key={img}
+                    type="button"
+                    onClick={()=>handleThumbClick(img)}
+                    className={`border rounded-md overflow-hidden h-20 flex items-center justify-center bg-gray-50 hover:border-indigo-500 transition ${selectedImage===img ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-gray-200'}`}
+                  >
+                    <img src={img} alt="thumb" className="object-contain h-full w-full" onError={(e)=>{e.currentTarget.src='/no-image.png'}} />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
@@ -91,13 +139,32 @@ const ProductPage = () => {
               </div>
               <span className="ml-2 text-sm text-gray-600">{product.rating} ({product.reviewCount})</span>
             </div>
-            <div className="text-3xl font-bold text-gray-900 mb-6">${product.price}</div>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="text-3xl font-bold text-gray-900">{product.priceDisplay || (product.price ? `$${product.price}` : '—')}</div>
+              {typeof product.quantity === 'number' && (
+                <span className="text-sm px-2 py-1 rounded bg-gray-100 text-gray-700">Qty: {product.quantity}</span>
+              )}
+            </div>
             <div className="flex gap-3">
               <button onClick={handleAdd} disabled={!product.inStock} className={`px-5 py-3 rounded-md text-white ${product.inStock ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-300 cursor-not-allowed'}`}>
                 {product.inStock ? 'Add to Cart' : 'Out of Stock'}
               </button>
-              <Link to={`/store/${product.storeId || 1}`} className="px-5 py-3 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">View Store</Link>
+              <Link
+                to={`/store/${(location.state && location.state.storeId) || product.storeId || product.raw?.store_id || 1}`}
+                className="px-5 py-3 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Back to Store
+              </Link>
             </div>
+            {product.manufacturer && (
+              <div className="mt-4 text-sm text-gray-600">Manufacturer: <span className="font-medium text-gray-800">{product.manufacturer}</span></div>
+            )}
+            {product.model && (
+              <div className="text-sm text-gray-600">Model: <span className="font-medium text-gray-800">{product.model}</span></div>
+            )}
+            {product.sku && (
+              <div className="text-sm text-gray-600">SKU: <span className="font-medium text-gray-800">{product.sku}</span></div>
+            )}
           </div>
         </div>
 
@@ -110,6 +177,11 @@ const ProductPage = () => {
               <button onClick={() => setActiveTab('description')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'description' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                 Description
               </button>
+              {product.attributeGroups && product.attributeGroups.length > 0 && (
+                <button onClick={() => setActiveTab('specs')} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'specs' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+                  Specs
+                </button>
+              )}
             </nav>
           </div>
 
@@ -146,7 +218,27 @@ const ProductPage = () => {
             <div className="py-6">
               <div className="bg-white p-6 rounded-lg shadow">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">About this product</h3>
-                <p className="text-gray-700 leading-relaxed">{product.description}</p>
+                <div className="prose max-w-none text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHTML(product.description) }} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'specs' && product.attributeGroups && (
+            <div className="py-6">
+              <div className="bg-white p-6 rounded-lg shadow space-y-6">
+                {product.attributeGroups.map(group => (
+                  <div key={group.attribute_group_id || group.name}>
+                    <h4 className="text-md font-semibold text-gray-800 mb-2">{group.name}</h4>
+                    <ul className="space-y-1">
+                      {Array.isArray(group.attribute) && group.attribute.map(attr => (
+                        <li key={attr.attribute_id || attr.name} className="flex justify-between text-sm border-b border-gray-100 py-1">
+                          <span className="text-gray-600">{attr.name}</span>
+                          <span className="font-medium text-gray-800">{attr.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
             </div>
           )}

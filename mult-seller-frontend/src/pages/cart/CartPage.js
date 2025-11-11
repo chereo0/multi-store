@@ -318,7 +318,13 @@ const CartPage = () => {
                           isDarkMode ? 'ring-2 ring-cyan-400/50' : 'ring-2 ring-cyan-300/50'
                         }`}>
                         <img
-                          src={item.product.image}
+                          src={
+                            item.product.image ||
+                            item.product.image_url ||
+                            item.product.picture ||
+                            item.product.raw?.image ||
+                            '/no-image.png'
+                          }
                           alt={item.product.name}
                             className="w-full h-full object-cover"
                         />

@@ -29,41 +29,7 @@ const StorePage = () => {
   const { isDarkMode, colors } = useTheme();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
-  // Place all hooks BEFORE any conditional returns to satisfy hooks rules
-  // Auto-detect background from /public (prioritize your template)
-  const nebulaCandidates = useMemo(
-    () => [
-      "/template.png",
-      "/Gemini_Generated_Image_bbj2vmbbj2vmbbj2.png",
-      "/Gemini_Generated_Image_pc6crxpc6crxpc6c.png",
-      "/Gemini_Generated_Image_enzgvmenzgvmenzg.png",
-      "/Gemini_Generated_Image_hy9bf7hy9bf7hy9b.png",
-    ],
-    []
-  );
-  const [nebula, setNebula] = useState(nebulaCandidates[0]);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      for (const url of nebulaCandidates) {
-        try {
-          await new Promise((res, rej) => {
-            const img = new Image();
-            img.onload = res;
-            img.onerror = rej;
-            img.src = url;
-          });
-          if (!cancelled) {
-            setNebula(url);
-            break;
-          }
-        } catch (_) {}
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [nebulaCandidates]);
+  // Background: we use a single `storebg.png` asset for both dark and light modes.
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,23 +53,31 @@ const StorePage = () => {
           prodPayload?.store ||
           null;
         if (embedded) {
+          const sanitizeField = (value) => {
+            if (value === null || value === undefined) return null;
+            const s = String(value).trim();
+            if (!s) return null;
+            const lower = s.toLowerCase();
+            if (lower === "null" || lower === "undefined" || s === "#") return null;
+            return s;
+          };
           const mapped = {
             id: embedded.store_id || embedded.id,
-            name: embedded.name,
-            owner: embedded.owner || embedded.store_owner || "",
-            description: embedded.description || "",
-            logo: embedded.profile_image || embedded.logo,
-            banner: embedded.background_image || embedded.banner,
-            email: embedded.email || "",
-            telephone: embedded.telephone || embedded.phone || "",
-            address: embedded.address || "",
-            whatsapp: embedded.whatsapp || "",
-            facebook: embedded.facebook || "",
-            twitter: embedded.twitter || "",
-            instagram: embedded.instagram || "",
-            linkedin: embedded.linkedin || "",
-            youtube: embedded.youtube || "",
-            tiktok: embedded.tiktok || "",
+            name: sanitizeField(embedded.name) || "",
+            owner: sanitizeField(embedded.owner || embedded.store_owner) || "",
+            description: sanitizeField(embedded.description) || "",
+            logo: sanitizeField(embedded.profile_image || embedded.logo),
+            banner: sanitizeField(embedded.background_image || embedded.banner),
+            email: sanitizeField(embedded.email),
+            telephone: sanitizeField(embedded.telephone || embedded.phone),
+            address: sanitizeField(embedded.address),
+            whatsapp: sanitizeField(embedded.whatsapp),
+            facebook: sanitizeField(embedded.facebook),
+            twitter: sanitizeField(embedded.twitter),
+            instagram: sanitizeField(embedded.instagram),
+            linkedin: sanitizeField(embedded.linkedin),
+            youtube: sanitizeField(embedded.youtube),
+            tiktok: sanitizeField(embedded.tiktok),
             product_limit:
               embedded.product_limit || embedded.productLimit || null,
             opening_hours:
@@ -255,17 +229,14 @@ const StorePage = () => {
         className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
           isDarkMode ? "bg-gray-900" : ""
         }`}
-        style={
-          !isDarkMode
-            ? {
-                backgroundImage: "url(/white%20backgroud.png)",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-                backgroundAttachment: "fixed",
-              }
-            : {}
-        }
+        style={{
+          // Use the same background in both dark and light modes
+          backgroundImage: "url('/storebg.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
+        }}
       >
         <div className="text-center">
           <h2
@@ -325,9 +296,8 @@ const StorePage = () => {
         isDarkMode ? "text-white" : "text-gray-900"
       }`}
       style={{
-        backgroundImage: isDarkMode
-          ? `url('${nebula}')`
-          : `url('/white%20backgroud.png')`,
+        // Use the same background for dark and light modes per request
+        backgroundImage: "url('/storebg.png')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -433,8 +403,15 @@ const StorePage = () => {
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
                 <img
-                  src={store.logo}
+                  src={
+                    store.logo || store.raw?.profile_image || store.raw?.logo || store.profile_image || '/no-image.png'
+                  }
                   alt={store.name}
+                  onError={(e) => {
+                    try {
+                      e.currentTarget.src = '/no-image.png';
+                    } catch (err) {}
+                  }}
                   className={`w-16 h-16 md:w-20 md:h-20 rounded-full border-4 transition-colors duration-300 ${
                     isDarkMode ? "border-white/70" : "border-gray-300"
                   }`}
@@ -531,6 +508,50 @@ const StorePage = () => {
                         className="text-sm text-pink-500"
                       >
                         Instagram
+                      </a>
+                    )}
+                    {store.linkedin && (
+                      <a
+                        href={store.linkedin}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-indigo-600"
+                      >
+                        LinkedIn
+                      </a>
+                    )}
+                    {store.youtube && (
+                      <a
+                        href={store.youtube}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-red-600"
+                      >
+                        YouTube
+                      </a>
+                    )}
+                    {store.tiktok && (
+                      <a
+                        href={store.tiktok}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-black"
+                      >
+                        TikTok
+                      </a>
+                    )}
+                    {store.whatsapp && (
+                      <a
+                        href={
+                          /^https?:\/\//i.test(store.whatsapp)
+                            ? store.whatsapp
+                            : `https://wa.me/${String(store.whatsapp).replace(/[^0-9+]/g, "")}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm text-green-600"
+                      >
+                        WhatsApp
                       </a>
                     )}
                   </div>
@@ -663,7 +684,7 @@ const StorePage = () => {
                             colors[isDarkMode ? "dark" : "light"].text
                           }`}
                         >
-                          <RouterLink to={`/product/${product.id}`}>
+                          <RouterLink to={`/product/${product.id}`} state={{ storeId }}>
                             {product.name}
                           </RouterLink>
                         </h3>
@@ -697,6 +718,14 @@ const StorePage = () => {
                         >
                           {product.inStock ? "Add to Cart" : "Out of Stock"}
                         </button>
+                        <RouterLink
+                          to={`/product/${product.id}`}
+                          state={{ storeId }}
+                          className="px-3 py-2 rounded-lg text-sm border border-cyan-400/50 text-cyan-400 hover:bg-cyan-400/10 transition-colors duration-200"
+                          aria-label={`View ${product.name}`}
+                        >
+                          View Product
+                        </RouterLink>
                         {qty > 0 && (
                           <span
                             className={`text-xs transition-colors duration-300 ${

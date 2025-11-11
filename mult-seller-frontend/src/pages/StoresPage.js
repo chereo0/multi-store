@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
-import { getHomePageBuilder } from "../api/services";
+import { getHomePageBuilder, getStoresByCategory } from "../api/services";
 
 const StoresPage = () => {
   const [stores, setStores] = useState([]);
@@ -15,9 +15,30 @@ const StoresPage = () => {
   }, [location.search]);
 
   useEffect(() => {
-    const fetchStoresFromHomeBuilder = async () => {
+    const fetch = async () => {
       try {
         setLoading(true);
+        const params = new URLSearchParams(location.search);
+        const categoryId = params.get("categoryId");
+
+        if (categoryId) {
+          // Try to fetch stores by category id/slug
+          const res = await getStoresByCategory(categoryId);
+          if (res) {
+            if (res.success) {
+              const data = res.data || [];
+              setStores(data);
+              // Do not show toast; the UI will render "No Stores Available" when data is empty
+              return;
+            } else {
+              // API returned success=false; fallback to empty list (UI will show no stores)
+              setStores([]);
+              return;
+            }
+          }
+          // if res is falsy, fallthrough to default home builder
+        }
+
         const response = await getHomePageBuilder();
         if (response && response.success && response.data) {
           let fetched = [];
@@ -39,14 +60,14 @@ const StoresPage = () => {
           setStores(fetched || []);
         }
       } catch (error) {
-        console.error("Error fetching stores from home_page_builder:", error);
+        console.error("Error fetching stores:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStoresFromHomeBuilder();
-  }, []);
+    fetch();
+  }, [location.search]);
 
   const filteredStores = useMemo(() => {
     if (!searchQuery) return stores;
@@ -67,17 +88,14 @@ const StoresPage = () => {
       className={`min-h-screen transition-colors duration-300 ${
         isDarkMode ? "bg-gray-900" : ""
       }`}
-      style={
-        !isDarkMode
-          ? {
-              backgroundImage: "url(/white%20backgroud.png)",
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              backgroundAttachment: "fixed",
-            }
-          : {}
-      }
+      style={{
+        // use same store background image for both dark and light modes
+        backgroundImage: "url('/storebg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
+      }}
     >
   {/* Spacer removed; global padding added in App.js */}
 
@@ -144,19 +162,17 @@ const StoresPage = () => {
                   >
                     <div className="text-center">
                       <div
-                        className={`w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                        className={`w-20 h-20 mx-auto mb-4 rounded-full overflow-hidden flex items-center justify-center ${
                           isDarkMode ? "bg-gray-700/50" : "bg-gray-100"
                         }`}
                       >
-                        <span
-                          className={`text-2xl font-bold ${
-                            isDarkMode ? "text-cyan-400" : "text-cyan-600"
-                          }`}
-                        >
-                          {store.name
-                            ? store.name.charAt(0).toUpperCase()
-                            : "S"}
-                        </span>
+                        <img
+                          src={
+                            store.logo || store.raw?.profile_image || store.raw?.logo || store.profile_image || '/no-image.png'
+                          }
+                          alt={store.name}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <h3
                         className={`text-xl font-bold mb-2 transition-colors duration-300 ${

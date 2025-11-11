@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 // import { useCart } from "../../context/CartContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -117,6 +117,8 @@ const Homepage = () => {
     fetchHomeData();
     fetchStores();
   }, []);
+
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -356,6 +358,11 @@ const Homepage = () => {
                           </p>
 
                           <button
+                            onClick={() => {
+                              const id = category.slug || category.category_id || category.id;
+                              // Navigate to stores with categoryId query param
+                              navigate(`/stores?categoryId=${encodeURIComponent(id)}`);
+                            }}
                             className="px-6 py-2 rounded-full text-sm font-semibold transition-all duration-300 hover:scale-105"
                             style={{
                               background: `linear-gradient(90deg, ${glowColor}, ${glowColor}80)`,
@@ -922,8 +929,15 @@ const Homepage = () => {
                               }}
                             >
                               <img
-                                src={store.logo}
+                                src={
+                                  store.logo || store.raw?.profile_image || store.raw?.logo || store.profile_image || '/no-image.png'
+                                }
                                 alt={`${store.name} logo`}
+                                onError={(e) => {
+                                  try {
+                                    e.currentTarget.src = '/no-image.png';
+                                  } catch (err) {}
+                                }}
                                 className="w-12 h-12 rounded-lg object-cover"
                               />
                             </div>

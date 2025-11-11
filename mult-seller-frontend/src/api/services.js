@@ -2,6 +2,16 @@
 // These will be replaced with actual Laravel backend API calls
 import api from "./index";
 
+// Helper: sanitize backend string fields (treat 'null', 'undefined', empty, '#') as null
+function sanitizeField(value) {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  const lower = s.toLowerCase();
+  if (lower === "null" || lower === "undefined" || s === "#") return null;
+  return s;
+}
+
 // Mock data for development
 const mockCategories = [
   {
@@ -166,6 +176,79 @@ const mockProducts = {
   ],
 };
 
+// Normalize product shape from various backend formats
+function normalizeProduct(raw) {
+  if (!raw) return null;
+  // Collect images from multiple possible fields and dedupe
+  const imageCandidates = [];
+  if (Array.isArray(raw.images)) imageCandidates.push(...raw.images);
+  if (Array.isArray(raw.original_images)) imageCandidates.push(...raw.original_images);
+  if (raw.image) imageCandidates.push(raw.image);
+  if (raw.original_image) imageCandidates.push(raw.original_image);
+  if (raw.image_url) imageCandidates.push(raw.image_url);
+  if (raw.picture) imageCandidates.push(raw.picture);
+  if (raw.image_url_1) imageCandidates.push(raw.image_url_1);
+  if (raw.image_1) imageCandidates.push(raw.image_1);
+  const images = Array.from(
+    new Set(
+      imageCandidates
+        .filter(Boolean)
+        .map((s) => String(s))
+    )
+  );
+  const image = images[0] || "/no-image.png";
+
+  // Price handling with formatted display from API when available
+  const rawPrice =
+    raw.price_formated ||
+    raw.price_text ||
+    raw.price_display ||
+    raw.amount ||
+    raw.price ||
+    null;
+  const numeric = typeof rawPrice === "string" ? parseFloat(String(rawPrice).replace(/[^0-9.]/g, "")) : rawPrice;
+
+  // Stock handling: prefer explicit status and quantity
+  const stockStatus = (raw.stock_status || raw.status_text || "").toString().toLowerCase();
+  const stockStatusId = typeof raw.stock_status_id !== "undefined" ? Number(raw.stock_status_id) : null;
+  const quantity = typeof raw.quantity !== "undefined" ? Number(raw.quantity) : null;
+  const inStockByStatus = stockStatus ? !stockStatus.includes("out of stock") && !stockStatus.includes("unavailable") : undefined;
+  const inStockById = stockStatusId !== null ? ![0, -1, 5].includes(stockStatusId) : undefined; // 5 often means Out Of Stock
+  const inStockByQty = quantity !== null ? quantity > 0 : undefined;
+  const computeInStock = () => {
+    if (typeof inStockByStatus !== "undefined") return inStockByStatus;
+    if (typeof inStockById !== "undefined") return inStockById;
+    if (typeof inStockByQty !== "undefined") return inStockByQty;
+    if (typeof raw.in_stock !== "undefined") return !!raw.in_stock;
+    if (typeof raw.stock !== "undefined") return Number(raw.stock) > 0;
+    return true;
+  };
+
+  return {
+    id: raw.product_id ?? raw.id ?? raw._id ?? null,
+    name: raw.name ?? raw.title ?? raw.product_name ?? "Product",
+    description: raw.description ?? raw.short_description ?? raw.desc ?? "",
+    images,
+    image,
+    price: Number.isFinite(numeric) ? numeric : (typeof raw.price === "number" ? raw.price : null),
+    priceDisplay:
+      (typeof raw.price_formated !== "undefined" && raw.price_formated) ||
+      rawPrice ||
+      (Number.isFinite(numeric) ? `$${numeric}` : null),
+    rating: raw.rating ?? raw.average_rating ?? null,
+    reviewCount: raw.reviewCount ?? raw.total_reviews ?? 0,
+    inStock: computeInStock(),
+    stock_status: raw.stock_status || null,
+    quantity: quantity,
+    manufacturer: raw.manufacturer || null,
+    model: raw.model || null,
+    sku: raw.sku || null,
+    attributeGroups: Array.isArray(raw.attribute_groups) ? raw.attribute_groups : [],
+    storeId: raw.store_id ?? raw.storeId ?? (raw.store && (raw.store.id || raw.store.store_id)) ?? null,
+    raw,
+  };
+}
+
 const mockReviews = {
   stores: {
     1: [
@@ -328,10 +411,35 @@ export const getStore = async (storeId) => {
     // Accept different API shapes: { success: 1|true, data: {...} } or direct object
     if (res && res.data) {
       const payload = res.data;
-      const data = payload.data || payload;
-      const ok =
-        payload.success === 1 || payload.success === true || !!payload.data;
-      return { success: ok, data };
+      const raw = payload.data || payload;
+      // Some APIs wrap the store under data.store_info (and may also include products)
+      const dataObj = (raw && (raw.store_info || raw.store || raw)) || null;
+      if (!dataObj) return { success: false, data: null };
+
+      // Normalize store shape so UI can rely on `logo` and `banner` fields
+      const normalized = {
+        id: dataObj.store_id ?? dataObj.id ?? dataObj._id ?? dataObj.slug ?? null,
+        name: sanitizeField(dataObj.name ?? dataObj.store_name ?? dataObj.title ?? "") || "",
+        description: sanitizeField(dataObj.description ?? dataObj.desc ?? dataObj.summary ?? "") || "",
+        logo: sanitizeField(dataObj.profile_image ?? dataObj.logo ?? dataObj.avatar ?? null),
+        banner: sanitizeField(dataObj.background_image ?? dataObj.banner ?? dataObj.cover ?? null),
+        owner: sanitizeField(dataObj.owner ?? dataObj.store_owner ?? null),
+        email: sanitizeField(dataObj.email ?? null),
+        telephone: sanitizeField(dataObj.telephone ?? dataObj.phone ?? null),
+        address: sanitizeField(dataObj.address ?? null),
+        whatsapp: sanitizeField(dataObj.whatsapp ?? null),
+        facebook: sanitizeField(dataObj.facebook ?? null),
+        twitter: sanitizeField(dataObj.twitter ?? null),
+        instagram: sanitizeField(dataObj.instagram ?? null),
+        linkedin: sanitizeField(dataObj.linkedin ?? null),
+        youtube: sanitizeField(dataObj.youtube ?? null),
+        tiktok: sanitizeField(dataObj.tiktok ?? null),
+        average_rating: dataObj.average_rating ?? dataObj.rating ?? null,
+        total_reviews: dataObj.total_reviews ?? dataObj.reviewCount ?? 0,
+        raw: dataObj,
+      };
+      const ok = payload.success === 1 || payload.success === true || !!payload.data;
+      return { success: ok, data: normalized };
     }
     return { success: false, data: null };
   } catch (error) {
@@ -342,7 +450,18 @@ export const getStore = async (storeId) => {
     // Fallback to mock store for local dev
     await new Promise((resolve) => setTimeout(resolve, 300));
     const store = mockStores.find((s) => s.id === parseInt(storeId));
-    return { success: !!store, data: store };
+    if (!store) return { success: false, data: null };
+    const normalized = {
+      id: store.id,
+      name: store.name,
+      description: store.description,
+      logo: store.logo || store.profile_image || null,
+      banner: store.banner || store.background_image || null,
+      average_rating: store.rating || null,
+      total_reviews: store.reviewCount || 0,
+      raw: store,
+    };
+    return { success: true, data: normalized };
   }
 };
 
@@ -352,12 +471,15 @@ export const getProducts = async (storeId) => {
     const res = await api.get(`/store/${storeId}/products`);
     if (res && res.data) {
       const payload = res.data;
-      const data = payload.data || payload;
-      const ok =
-        payload.success === 1 ||
-        payload.success === true ||
-        Array.isArray(data);
-      return { success: ok, data };
+      // Attempt to extract array of products from possible shapes
+      let data = payload.data || payload;
+      if (!Array.isArray(data)) {
+        data = data?.products || data?.new_products || data?.items || [];
+      }
+      const arr = Array.isArray(data) ? data : [];
+      const normalized = arr.map(normalizeProduct);
+      const ok = payload.success === 1 || payload.success === true || arr.length >= 0;
+      return { success: ok, data: normalized };
     }
     return { success: false, data: [] };
   } catch (error) {
@@ -367,19 +489,34 @@ export const getProducts = async (storeId) => {
     );
     // Fallback: return empty list (do not surface mock products in production)
     await new Promise((resolve) => setTimeout(resolve, 200));
-    return { success: true, data: [] };
+    // For local dev, map mockProducts to normalized shape if available
+    const list = mockProducts[storeId] || [];
+    return { success: true, data: list.map(normalizeProduct) };
   }
 };
 
 export const getProduct = async (productId) => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  // Try real API first: GET /products/:id
+  try {
+    const res = await api.get(`/products/${productId}`);
+    if (res && res.data) {
+      const payload = res.data;
+      const raw = payload.data || payload.product || payload;
+      if (raw && (raw.product_id || raw.id || raw.name)) {
+        return { success: true, data: normalizeProduct(raw) };
+      }
+    }
+  } catch (err) {
+    console.warn("getProduct API failed, falling back to mock:", err?.message || err);
+  }
+  // Fallback to mock data
+  await new Promise((resolve) => setTimeout(resolve, 150));
   let product = null;
   for (const storeProducts of Object.values(mockProducts)) {
     product = storeProducts.find((p) => p.id === parseInt(productId));
     if (product) break;
   }
-  return { success: !!product, data: product };
+  return { success: !!product, data: normalizeProduct(product) };
 };
 
 export const getStoreReviews = async (storeId) => {
