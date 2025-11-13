@@ -993,6 +993,162 @@ export const submitOrder = async (orderData) => {
   };
 };
 
+// Checkout APIs
+// Shipping methods
+export const getShippingMethods = async () => {
+  try {
+    const res = await api.get("/shippingmethods");
+    if (res && res.data) {
+      const body = res.data;
+      const raw = body.data || body.methods || body.shipping_methods || body;
+
+      const entries = [];
+      const pushRate = (rate, fallbackCode) => {
+        if (!rate) return;
+        const code = rate.code || rate.value || fallbackCode;
+        const title = rate.title || rate.name || rate.label || rate.method_title || rate.method || code;
+        const cost = rate.cost ?? rate.price ?? rate.fee ?? rate.total;
+        const selected = !!(rate.selected || rate.default || rate.is_default);
+        if (code) entries.push({ code, title, cost, selected });
+      };
+
+      const flattenContainer = (container) => {
+        if (!container) return;
+        if (Array.isArray(container)) {
+          container.forEach((item) => {
+            if (item && (item.quote || item.quotes)) {
+              const q = item.quote || item.quotes;
+              if (Array.isArray(q)) q.forEach((r) => pushRate(r));
+              else if (q && typeof q === 'object') Object.keys(q).forEach((k) => pushRate(q[k], k));
+            } else {
+              pushRate(item);
+            }
+          });
+        } else if (typeof container === 'object') {
+          Object.keys(container).forEach((k) => {
+            const method = container[k];
+            if (method && (method.quote || method.quotes)) {
+              const q = method.quote || method.quotes;
+              if (Array.isArray(q)) q.forEach((r) => pushRate(r));
+              else if (q && typeof q === 'object') Object.keys(q).forEach((rk) => pushRate(q[rk], rk));
+            } else {
+              pushRate(method, k);
+            }
+          });
+        }
+      };
+
+      if (Array.isArray(raw) || typeof raw === 'object') {
+        const container = Array.isArray(raw) ? raw : (raw.methods || raw.shipping_methods || raw.shipping || raw.quotes || raw);
+        flattenContainer(container);
+      }
+
+      if (entries.length === 0 && raw && typeof raw === 'object') {
+        Object.values(raw).forEach((v) => flattenContainer(v));
+      }
+
+      const seen = new Set();
+      const normalized = entries.filter((r) => {
+        if (seen.has(r.code)) return false;
+        seen.add(r.code);
+        return true;
+      });
+
+      return { success: true, data: normalized };
+    }
+    return { success: false, data: [] };
+  } catch (err) {
+    console.warn("getShippingMethods failed:", err?.message || err);
+    return { success: false, data: [], error: err?.message || String(err) };
+  }
+};
+
+export const selectShippingMethod = async (code, agree = 1, comment = "") => {
+  try {
+    // Force agree=1 and send shipping_method based on provided code
+    const payload = { shipping_method: code, agree: 1, comment };
+    const res = await api.post("/shippingmethods", payload);
+    if (res && res.data) {
+      const body = res.data;
+      const ok = body.success === 1 || body.success === true || !!body.data;
+      return { success: !!ok, data: body.data || null, message: body.message };
+    }
+    return { success: false };
+  } catch (err) {
+    console.warn("selectShippingMethod failed:", err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+};
+
+// Payment methods
+export const getPaymentMethods = async () => {
+  try {
+    const res = await api.get("/paymentmethods");
+    if (res && res.data) {
+      const body = res.data;
+      const raw = body.data || body.methods || body;
+      let list = [];
+      if (Array.isArray(raw)) {
+        list = raw;
+      } else if (raw && typeof raw === 'object') {
+        const container = raw.methods || raw.payment_methods || raw;
+        if (Array.isArray(container)) list = container;
+        else if (container && typeof container === 'object') {
+          // Ensure the map key becomes the final code value
+          list = Object.keys(container).map((k) => ({ ...(container[k] || {}), code: k }));
+        }
+      }
+      const normalized = list.map((m) => ({
+        code: m.code || m.id || m.method || m.value || '',
+        title: m.title || m.name || m.label || m.code || 'Payment',
+        selected: !!(m.selected || m.default || m.is_default)
+      })).filter(m => m.code);
+      return { success: true, data: normalized };
+    }
+    return { success: false, data: [] };
+  } catch (err) {
+    console.warn("getPaymentMethods failed:", err?.message || err);
+    return { success: false, data: [], error: err?.message || String(err) };
+  }
+};
+
+export const selectPaymentMethod = async (code, agree = 1, comment = "") => {
+  try {
+    // Force COD payment per spec: always send payment_method="cod", agree=1, and include comment
+    const payload = { payment_method: "cod", agree: 1, comment };
+    const res = await api.post("/paymentmethods", payload);
+    if (res && res.data) {
+      const body = res.data;
+      const ok = body.success === 1 || body.success === true || !!body.data;
+      return { success: !!ok, data: body.data || null, message: body.message };
+    }
+    return { success: false };
+  } catch (err) {
+    console.warn("selectPaymentMethod failed:", err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+};
+
+// Confirm order
+export const confirmCheckout = async (addressId) => {
+  try {
+    // Confirm order with POST /confirm; backend expects { address_id }
+    // Always include address_id as requested
+    const payload = { address_id: addressId };
+    const res = await api.post("/confirm", payload);
+    if (res && res.data) {
+      const body = res.data;
+      const data = body.data || body;
+      const ok = body.success === 1 || body.success === true || !!body.data;
+      return { success: !!ok, data, message: body.message || data.message };
+    }
+    return { success: false };
+  } catch (err) {
+    console.warn("confirmCheckout failed:", err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+};
+
 // Get or refresh client credentials token
 export const getClientToken = async () => {
   try {

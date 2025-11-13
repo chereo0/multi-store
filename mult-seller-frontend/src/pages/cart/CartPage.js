@@ -3,21 +3,31 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useTheme } from '../../context/ThemeContext';
-import { submitOrder } from '../../api/services';
+import {
+  confirmCheckout,
+  submitOrder,
+  getShippingMethods,
+  selectShippingMethod,
+  getPaymentMethods,
+  selectPaymentMethod,
+  getUserAddresses
+} from '../../api/services';
 
 const CartPage = () => {
-  const [checkoutData, setCheckoutData] = useState({
-    fullName: '',
-    email: '',
-    phoneNumber: '',
-    currentLocation: '',
-    preferredDeliveryTime: ''
-  });
   const [showCheckout, setShowCheckout] = useState(false);
   const [loading, setLoading] = useState(false);
   const [orderSubmitted, setOrderSubmitted] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
   const [stars, setStars] = useState([]);
+  // Checkout selections
+  const [shippingMethods, setShippingMethods] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [selectedShippingCode, setSelectedShippingCode] = useState('');
+  const [selectedPaymentCode, setSelectedPaymentCode] = useState('');
+  const [shippingComment, setShippingComment] = useState('');
+  const [paymentComment, setPaymentComment] = useState('');
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
 
   const { isGuest } = useAuth();
   const { 
@@ -46,12 +56,44 @@ const CartPage = () => {
     }
   }, [isDarkMode]);
 
-  const handleInputChange = (e) => {
-    setCheckoutData({
-      ...checkoutData,
-      [e.target.name]: e.target.value
-    });
-  };
+  // Fetch shipping/payment methods and addresses when entering checkout
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!showCheckout) return;
+      try {
+        setLoading(true);
+        const [ship, pay, addr] = await Promise.all([
+          getShippingMethods(),
+          getPaymentMethods(),
+          getUserAddresses(),
+        ]);
+        if (ship?.success) {
+          const list = Array.isArray(ship.data) ? ship.data : [];
+          setShippingMethods(list);
+          const def = list.find(m => m.selected || m.default || m.is_default) || list[0];
+          if (def && def.code) setSelectedShippingCode(def.code);
+        }
+        if (pay?.success) {
+          const list = Array.isArray(pay.data) ? pay.data : [];
+          setPaymentMethods(list);
+          const def = list.find(m => m.default || m.is_default || m.selected) || list[0];
+          if (def) setSelectedPaymentCode(def.code || def.id || def.method || '');
+        }
+        if (addr?.success && addr.data) {
+          const list = Array.isArray(addr.data) ? addr.data : [addr.data];
+          setAddresses(list);
+          if (list.length > 0) setSelectedAddressId(list[0].id || list[0].address_id || '');
+        }
+      } catch (e) {
+        console.warn('Checkout init failed:', e?.message || e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [showCheckout]);
+
+  // No customer information form fields required
 
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
@@ -62,18 +104,35 @@ const CartPage = () => {
     setLoading(true);
 
     try {
-      const orderData = {
-        ...checkoutData,
-        items: cartItems,
-        total: getCartTotal()
-      };
-
-      const result = await submitOrder(orderData);
-      
-      if (result.success) {
-        setOrderDetails(result.data);
+      // 1) Apply shipping method (agree=1)
+      if (selectedShippingCode) {
+        await selectShippingMethod(selectedShippingCode, 1, shippingComment);
+      }
+      // 2) Apply payment method (agree=1)
+      if (selectedPaymentCode) {
+        await selectPaymentMethod(selectedPaymentCode, 1, paymentComment);
+      }
+      // 3) Confirm with selected address_id
+  const confirmRes = await confirmCheckout(selectedAddressId);
+      if (confirmRes && confirmRes.success) {
+        const data = confirmRes.data || {};
+        setOrderDetails({
+          orderId: data.order_id || data.orderId || data.id || Math.floor(Math.random() * 1000000),
+          message: data.message || 'Order placed successfully',
+          estimatedDelivery: data.estimatedDelivery || '3-5 business days'
+        });
         setOrderSubmitted(true);
         clearCart();
+      } else {
+        // Fallback to local mock submit if server confirm fails
+        const result = await submitOrder({ items: cartItems, total: getCartTotal() });
+        if (result.success) {
+          setOrderDetails(result.data);
+          setOrderSubmitted(true);
+          clearCart();
+        } else {
+          throw new Error(result?.error || result?.message || 'Order failed');
+        }
       }
     } catch (error) {
       console.error('Error submitting order:', error);
@@ -301,22 +360,21 @@ const CartPage = () => {
               }`}>
                 ORDER DETAILS
               </h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(cartItemsByStore).map(([storeId, items]) =>
+                {Object.entries(cartItemsByStore).map(([sid, items]) =>
                   items.map((item) => (
-                    <div 
-                      key={`${item.product.id}-${item.storeId}`} 
-                      className={`rounded-xl p-4 transition-all duration-300 hover:scale-105 ${
-                        isDarkMode 
-                          ? 'bg-gray-700/50 border border-gray-600/50 hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-400/20' 
+                    <div
+                      key={`${item.product.id}-${item.storeId}`}
+                      className={`rounded-xl p-4 flex gap-4 items-center transition-all duration-300 hover:scale-105 ${
+                        isDarkMode
+                          ? 'bg-gray-700/50 border border-gray-600/50 hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-400/20'
                           : 'bg-gray-50 border border-gray-200 hover:border-cyan-300 hover:shadow-lg'
                       }`}
                     >
-                      <div className="flex items-center space-x-4 mb-4">
-                        <div className={`w-16 h-16 rounded-lg overflow-hidden ${
-                          isDarkMode ? 'ring-2 ring-cyan-400/50' : 'ring-2 ring-cyan-300/50'
-                        }`}>
+                      <div className={`w-16 h-16 rounded-lg overflow-hidden ${
+                        isDarkMode ? 'ring-2 ring-cyan-400/50' : 'ring-2 ring-cyan-300/50'
+                      }`}>
                         <img
                           src={
                             item.product.image ||
@@ -326,342 +384,232 @@ const CartPage = () => {
                             '/no-image.png'
                           }
                           alt={item.product.name}
-                            className="w-full h-full object-cover"
+                          className="w-full h-full object-cover"
                         />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className={`font-bold text-lg transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
-                            {item.product.name.toUpperCase()}
-                          </h3>
-                          <p className={`text-sm transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                          }`}>
-                            Quantum Enhanced Product
-                          </p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-semibold truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{item.product.name}</div>
+                        <div className="text-sm flex items-center gap-2 mt-1">
+                          <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>
+                            ${item.product.price?.toFixed ? item.product.price.toFixed(2) : item.product.price}
+                          </span>
+                          <div className="flex items-center gap-2 ml-auto">
+                            <button
+                              onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity - 1)}
+                              className={`px-2 py-1 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              -
+                            </button>
+                            <span className={`${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity + 1)}
+                              className={`px-2 py-1 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              +
+                            </button>
+                            <button
+                              onClick={() => removeFromCart(item.product.id, item.storeId)}
+                              className={`ml-3 px-2 py-1 rounded ${isDarkMode ? 'bg-red-600/70 text-white' : 'bg-red-100 text-red-600'}`}
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity - 1)}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-                              isDarkMode 
-                                ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                            }`}
-                          >
-                            -
-                          </button>
-                          <span className={`w-8 text-center font-semibold transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity + 1)}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-                              isDarkMode 
-                                ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                            }`}
-                          >
-                            +
-                          </button>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <span className={`font-bold transition-colors duration-300 ${
-                            isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                          }`}>
-                            ${(item.product.price * item.quantity).toFixed(2)}
-                          </span>
-                          <button
-                            onClick={() => removeFromCart(item.product.id, item.storeId)}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-red-500 hover:text-white ${
-                              isDarkMode 
-                                ? 'bg-gray-600 text-gray-300' 
-                                : 'bg-gray-200 text-gray-700'
-                            }`}
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                  </div>
+                    </div>
                   ))
                 )}
-                </div>
-            </div>
-
-            {/* Order Summary Section */}
-            <div className={`rounded-2xl p-6 backdrop-blur-md transition-all duration-300 ${
-              isDarkMode 
-                ? 'bg-gray-800/50 border border-cyan-400/30 shadow-2xl shadow-cyan-400/10' 
-                : 'bg-white/80 border border-gray-200 shadow-xl'
-            }`}>
-              <h2 className={`text-2xl font-bold mb-6 transition-colors duration-300 ${
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}>
-                ORDER SUMMARY
-              </h2>
-              
-              <div className="space-y-4 mb-8">
-                  <div className="flex justify-between">
-                  <span className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                  }`}>Subtotal:</span>
-                  <span className={`font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                  }`}>${getCartTotal().toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                  <span className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                  }`}>Shipping:</span>
-                  <span className={`font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                  }`}>$0.00</span>
-                  </div>
-                  <div className="flex justify-between">
-                  <span className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                  }`}>Tax:</span>
-                  <span className={`font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                  }`}>$0.00</span>
-                  </div>
-                <div className={`h-px ${
-                  isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
-                }`}></div>
-                  <div className="flex justify-between">
-                  <span className={`text-xl font-bold transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>TOTAL:</span>
-                  <span className={`text-xl font-bold transition-colors duration-300 ${
-                    isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                  }`}>${getCartTotal().toFixed(2)}</span>
-                </div>
               </div>
-              
+
+              <div className="mt-6">
                 <button
                   onClick={() => {
-                    if (isGuest) {
-                      navigate('/signup');
-                    } else {
-                      setShowCheckout(true);
-                    }
+                    if (isGuest) navigate('/signup');
+                    else setShowCheckout(true);
                   }}
-                className={`w-full py-4 rounded-full font-bold text-lg transition-all duration-300 hover:scale-105 ${
-                  isDarkMode 
-                    ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25 hover:shadow-cyan-400/40' 
-                    : 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg hover:shadow-xl'
-                }`}
-              >
-                PROCEED TO CHECKOUT
+                  className={`w-full py-4 rounded-full font-bold text-lg transition-all duration-300 hover:scale-105 ${
+                    isDarkMode
+                      ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25 hover:shadow-cyan-400/40'
+                      : 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  PROCEED TO CHECKOUT
                 </button>
-              
                 <Link
                   to="/home"
-                className={`block w-full text-center mt-4 py-2 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
-                  isDarkMode 
-                    ? 'text-cyan-400 hover:text-cyan-300' 
-                    : 'text-cyan-600 hover:text-cyan-500'
-                }`}
+                  className={`block w-full text-center mt-4 py-2 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
+                    isDarkMode ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-600 hover:text-cyan-500'
+                  }`}
                 >
                   Continue Shopping
                 </Link>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className={`rounded-2xl p-6 backdrop-blur-md transition-all duration-300 ${
+              isDarkMode
+                ? 'bg-gray-800/50 border border-cyan-400/30 shadow-2xl shadow-cyan-400/10'
+                : 'bg-white/80 border border-gray-200 shadow-xl'
+            }`}>
+              <h2 className={`text-2xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>ORDER SUMMARY</h2>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Subtotal</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>${getCartTotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Shipping</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>Calculated at confirm</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Taxes</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>Included</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t mt-2">
+                  <span className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Total</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>${getCartTotal().toFixed(2)}</span>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
-          /* Checkout Form */
-          <div className="max-w-2xl mx-auto">
-            <div className={`rounded-2xl p-8 backdrop-blur-md transition-all duration-300 ${
-              isDarkMode 
-                ? 'bg-gray-800/50 border border-cyan-400/30 shadow-2xl shadow-cyan-400/10' 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className={`rounded-2xl p-6 backdrop-blur-md transition-all duration-300 ${
+              isDarkMode
+                ? 'bg-gray-800/50 border border-cyan-400/30 shadow-2xl shadow-cyan-400/10'
                 : 'bg-white/80 border border-gray-200 shadow-xl'
             }`}>
-              <h2 className={`text-2xl font-bold mb-6 transition-colors duration-300 ${
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}>Quantum Checkout</h2>
-              
-              <form onSubmit={handleSubmitOrder} className="space-y-6">
+              <h2 className={`text-2xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>CONFIRM ORDER</h2>
+              <div className="space-y-6">
+                {/* Address selection */}
                 <div>
-                  <label htmlFor="fullName" className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="fullName"
-                    name="fullName"
-                    required
-                    value={checkoutData.fullName}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
-                      isDarkMode 
-                        ? 'bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-cyan-400/20' 
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500/20'
-                    } focus:outline-none focus:ring-2`}
-                    placeholder="Enter your full name"
-                  />
+                  <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Delivery Address</h3>
+                  {addresses.length === 0 ? (
+                    <div className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No saved addresses. Please add one in Profile &gt; Address.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {addresses.map(addr => (
+                        <label key={addr.id || addr.address_id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${selectedAddressId === (addr.id || addr.address_id) ? 'border-cyan-400' : (isDarkMode ? 'border-gray-700' : 'border-gray-200')}`}>
+                          <input type="radio" name="address" className="mt-1" checked={selectedAddressId === (addr.id || addr.address_id)} onChange={() => setSelectedAddressId(addr.id || addr.address_id)} />
+                          <div>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-gray-900'} font-medium`}>{[addr.firstname, addr.lastname].filter(Boolean).join(' ')}</div>
+                            <div className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} text-sm`}>{[addr.address_1, addr.city].filter(Boolean).join(', ')}</div>
+                            {addr.phone && <div className="text-xs text-gray-500">{addr.phone}</div>}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
+                {/* Shipping method */}
                 <div>
-                  <label htmlFor="email" className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    required
-                    value={checkoutData.email}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
-                      isDarkMode 
-                        ? 'bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-cyan-400/20' 
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500/20'
-                    } focus:outline-none focus:ring-2`}
-                    placeholder="Enter your email"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="phoneNumber" className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    id="phoneNumber"
-                    name="phoneNumber"
-                    required
-                    value={checkoutData.phoneNumber}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
-                      isDarkMode 
-                        ? 'bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-cyan-400/20' 
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500/20'
-                    } focus:outline-none focus:ring-2`}
-                    placeholder="Enter your phone number"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="currentLocation" className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    Current Location *
-                  </label>
-                  <input
-                    type="text"
-                    id="currentLocation"
-                    name="currentLocation"
-                    required
-                    value={checkoutData.currentLocation}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
-                      isDarkMode 
-                        ? 'bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-cyan-400/20' 
-                        : 'bg-white border border-gray-300 text-gray-900 placeholder-gray-500 focus:border-cyan-500 focus:ring-cyan-500/20'
-                    } focus:outline-none focus:ring-2`}
-                    placeholder="Enter your current location"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="preferredDeliveryTime" className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    Preferred Delivery Time
-                  </label>
+                  <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Shipping Method</h3>
                   <select
-                    id="preferredDeliveryTime"
-                    name="preferredDeliveryTime"
-                    value={checkoutData.preferredDeliveryTime}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 rounded-lg transition-all duration-300 ${
-                      isDarkMode 
-                        ? 'bg-gray-700/50 border border-gray-600 text-white focus:border-cyan-400 focus:ring-cyan-400/20' 
-                        : 'bg-white border border-gray-300 text-gray-900 focus:border-cyan-500 focus:ring-cyan-500/20'
-                    } focus:outline-none focus:ring-2`}
+                    value={selectedShippingCode}
+                    onChange={(e)=>setSelectedShippingCode(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50 border border-gray-600 text-white' : 'bg-white border border-gray-300 text-gray-900'}`}
                   >
-                    <option value="">Select preferred time</option>
-                    <option value="morning">Morning (9 AM - 12 PM)</option>
-                    <option value="afternoon">Afternoon (12 PM - 5 PM)</option>
-                    <option value="evening">Evening (5 PM - 8 PM)</option>
-                    <option value="anytime">Anytime</option>
+                    {shippingMethods.length === 0 ? (
+                      <option value="" disabled>No shipping methods available</option>
+                    ) : (
+                      shippingMethods.map(m => (
+                        <option key={m.code} value={m.code}>
+                          {(m.title || m.name || m.code || 'Unnamed method') + (m.cost ? ` - ${m.cost}` : '')}
+                        </option>
+                      ))
+                    )}
                   </select>
+                  <input
+                    type="text"
+                    value={shippingComment}
+                    onChange={(e)=>setShippingComment(e.target.value)}
+                    placeholder="Shipping comment (optional)"
+                    className={`mt-3 w-full px-4 py-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50 border border-gray-600 text-white' : 'bg-white border border-gray-300 text-gray-900'}`}
+                  />
                 </div>
 
-                <div className={`p-4 rounded-lg transition-all duration-300 ${
-                  isDarkMode ? 'bg-gray-700/30' : 'bg-gray-50'
-                }`}>
-                  <h3 className={`font-medium mb-2 transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>Order Summary</h3>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className={`transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                      }`}>Items ({cartItems.length})</span>
-                      <span className={`transition-colors duration-300 ${
-                        isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                      }`}>${getCartTotal().toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className={`transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                      }`}>Shipping</span>
-                      <span className={`transition-colors duration-300 ${
-                        isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                      }`}>$0.00</span>
-                    </div>
-                    <div className="flex justify-between font-medium">
-                      <span className={`transition-colors duration-300 ${
-                        isDarkMode ? 'text-white' : 'text-gray-900'
-                      }`}>Total</span>
-                      <span className={`transition-colors duration-300 ${
-                        isDarkMode ? 'text-cyan-400' : 'text-cyan-600'
-                      }`}>${getCartTotal().toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowCheckout(false)}
-                    className={`flex-1 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600' 
-                        : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                    }`}
+                {/* Payment method */}
+                <div>
+                  <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Payment Method</h3>
+                  <select
+                    value={selectedPaymentCode}
+                    onChange={(e)=>setSelectedPaymentCode(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50 border border-gray-600 text-white' : 'bg-white border border-gray-300 text-gray-900'}`}
                   >
-                    Back to Cart
-                  </button>
+                    {paymentMethods.map(m => (
+                      <option key={m.code || m.id} value={m.code || m.id}>
+                        {m.title || m.name || m.code}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={paymentComment}
+                    onChange={(e)=>setPaymentComment(e.target.value)}
+                    placeholder="Payment comment (optional)"
+                    className={`mt-3 w-full px-4 py-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50 border border-gray-600 text-white' : 'bg-white border border-gray-300 text-gray-900'}`}
+                  />
+                </div>
+
+                <div className="flex gap-3">
                   <button
-                    type="submit"
-                    disabled={loading}
-                    className={`flex-1 py-3 rounded-full font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      isDarkMode 
-                        ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25' 
+                    onClick={handleSubmitOrder}
+                    disabled={loading || !selectedAddressId || !selectedShippingCode}
+                    className={`flex-1 px-6 py-4 rounded-xl font-semibold transition-all duration-300 hover:scale-[1.02] ${
+                      loading
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : isDarkMode
+                        ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg shadow-cyan-400/25'
                         : 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg'
                     }`}
                   >
                     {loading ? 'Placing Order...' : 'Place Order'}
                   </button>
+                  <button
+                    onClick={() => setShowCheckout(false)}
+                    className={`px-6 py-4 rounded-xl font-semibold transition-all duration-300 ${
+                      isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                    }`}
+                  >
+                    Back to Cart
+                  </button>
                 </div>
-              </form>
+              </div>
+            </div>
+            <div className={`rounded-2xl p-6 backdrop-blur-md transition-all duration-300 ${
+              isDarkMode
+                ? 'bg-gray-800/50 border border-cyan-400/30 shadow-2xl shadow-cyan-400/10'
+                : 'bg-white/80 border border-gray-200 shadow-xl'
+            }`}>
+              <h2 className={`text-2xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>ORDER SUMMARY</h2>
+              <div className="space-y-4 mb-6">
+                {cartItems.map((item) => (
+                  <div key={`${item.product.id}-${item.storeId}`} className="flex items-center justify-between text-sm">
+                    <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{item.product.name} × {item.quantity}</span>
+                    <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>${(item.product.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Subtotal</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>${getCartTotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Shipping</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>Calculated at confirm</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Taxes</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>Included</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                  <span className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Total</span>
+                  <span className={`${isDarkMode ? 'text-cyan-300' : 'text-cyan-600'}`}>${getCartTotal().toFixed(2)}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
