@@ -1149,6 +1149,55 @@ export const confirmCheckout = async (addressId) => {
   }
 };
 
+// Orders APIs
+export const getCustomerOrders = async () => {
+  try {
+    const res = await api.get("/customerorders");
+    const body = res?.data || {};
+    const list = body.data || body.orders || body || [];
+    const items = Array.isArray(list) ? list : (Array.isArray(list.items) ? list.items : []);
+    return { success: true, data: items };
+  } catch (err) {
+    console.warn("getCustomerOrders failed:", err?.message || err);
+    return { success: false, data: [], error: err?.message || String(err) };
+  }
+};
+
+export const getCustomerOrderById = async (id) => {
+  try {
+    const res = await api.get(`/customerorders/${id}`);
+    const body = res?.data || {};
+    const data = body.data || body.order || body;
+    return { success: true, data };
+  } catch (err) {
+    console.warn("getCustomerOrderById failed:", err?.message || err);
+    return { success: false, error: err?.message || String(err) };
+  }
+};
+
+export const cancelOrder = async (id) => {
+  try {
+    // Prefer POST, fallback to GET on method not allowed
+    try {
+      const res = await api.post(`/cancelOrder/${id}`);
+      const body = res?.data || {};
+      const ok = body.success === 1 || body.success === true || !!body.data;
+      return { success: !!ok, data: body.data || null, message: body.message };
+    } catch (inner) {
+      if (inner?.response?.status === 405) {
+        const res = await api.get(`/cancelOrder/${id}`);
+        const body = res?.data || {};
+        const ok = body.success === 1 || body.success === true || !!body.data;
+        return { success: !!ok, data: body.data || null, message: body.message };
+      }
+      throw inner;
+    }
+  } catch (err) {
+    console.warn("cancelOrder failed:", err?.message || err);
+    return { success: false, error: err?.response?.data?.message || err?.message || String(err) };
+  }
+};
+
 // Get or refresh client credentials token
 export const getClientToken = async () => {
   try {

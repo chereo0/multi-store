@@ -212,6 +212,21 @@ const Navbar = () => {
                     </Link>
 
                     <Link
+                      to="/orders"
+                      className={`block px-4 py-2 text-sm transition-colors duration-300 hover:bg-opacity-10 ${
+                        isDarkMode
+                          ? "text-gray-300 hover:text-white hover:bg-white"
+                          : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                      }`}
+                      role="menuitem"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5 21h14M7 13l2 8m6-8l-2 8"/></svg>
+                        <span>Orders</span>
+                      </div>
+                    </Link>
+
+                    <Link
                       to="/address"
                       className={`block px-4 py-2 text-sm transition-colors duration-300 hover:bg-opacity-10 ${
                         isDarkMode
@@ -391,6 +406,17 @@ const Navbar = () => {
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Profile
+                    </Link>
+                    <Link
+                      to="/orders"
+                      className={`block px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-300 ${
+                        isDarkMode
+                          ? "text-gray-300 hover:bg-gray-700"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Orders
                     </Link>
                     <Link
                       to="/address"

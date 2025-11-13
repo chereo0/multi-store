@@ -30,6 +30,8 @@ import StoresPage from "./pages/StoresPage";
 import ContactPage from "./pages/ContactPage";
 import ProfilePage from "./pages/ProfilePage";
 import AddressPage from "./pages/AddressPage";
+import OrdersPage from "./pages/orders/OrdersPage";
+import OrderDetailPage from "./pages/orders/OrderDetailPage";
 import { useInitialApiCall } from "./hooks/useApiCall";
 
 const AnimatedRoutes = () => {
@@ -43,6 +45,8 @@ const AnimatedRoutes = () => {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/address" element={<AddressPage />} />
+  <Route path="/orders" element={<OrdersPage />} />
+  <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/auth" element={<AuthPage />} />

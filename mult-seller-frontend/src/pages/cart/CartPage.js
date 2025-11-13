@@ -395,14 +395,14 @@ const CartPage = () => {
                           </span>
                           <div className="flex items-center gap-2 ml-auto">
                             <button
-                              onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity - 1)}
+                              onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity - 1, item.option)}
                               className={`px-2 py-1 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
                             >
                               -
                             </button>
                             <span className={`${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{item.quantity}</span>
                             <button
-                              onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity + 1)}
+                              onClick={() => updateQuantity(item.product.id, item.storeId, item.quantity + 1, item.option)}
                               className={`px-2 py-1 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
                             >
                               +

@@ -59,33 +59,66 @@ export const CartProvider = ({ children }) => {
     localStorage.setItem("cart", JSON.stringify(cartItems));
   }, [cartItems]);
 
-  const addToCart = async (product, storeId, quantity = 1) => {
+  const addToCart = async (product, storeId, quantity = 1, option) => {
     // Keep backup for revert if server call fails
     backupRef.current = null;
+    const sameOption = (a, b) => {
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      return (
+        String(a.product_option_id) === String(b.product_option_id) &&
+        String(a.product_option_value_id) === String(b.product_option_value_id)
+      );
+    };
     setCartItems((prev) => {
       backupRef.current = prev;
       const existingItem = prev.find(
-        (item) => item.product.id === product.id && item.storeId === storeId
+        (item) => item.product.id === product.id && item.storeId === storeId && sameOption(item.option, option)
       );
 
       if (existingItem) {
         return prev.map((item) =>
-          item.product.id === product.id && item.storeId === storeId
+          item.product.id === product.id && item.storeId === storeId && sameOption(item.option, option)
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       } else {
-        return [...prev, { product, storeId, quantity }];
+        return [...prev, { product, storeId, quantity, option: option ? { 
+          product_option_id: option.product_option_id,
+          product_option_value_id: option.product_option_value_id
+        } : undefined }];
       }
     });
 
-    // Send to server (optimistic). Payload shape: { product_id, quantity, store_id }
+    // Send to server (optimistic). Payload shape: { product_id, quantity, store_id, option? }
     try {
       const payload = {
         product_id: product.id,
         quantity,
         store_id: storeId,
       };
+      // Include product option if provided. Backend expects mapping of product_option_id -> product_option_value_id
+      // Accept a single option object or an array of them.
+      if (option) {
+        const buildOptionMap = (opt) => ({
+          [String(opt.product_option_id)]: String(opt.product_option_value_id),
+        });
+        if (Array.isArray(option) && option.length > 0) {
+          payload.option = option.reduce((acc, opt) => {
+            if (opt && opt.product_option_id && opt.product_option_value_id) {
+              acc[String(opt.product_option_id)] = String(
+                opt.product_option_value_id
+              );
+            }
+            return acc;
+          }, {});
+        } else if (
+          option.product_option_id &&
+          option.product_option_value_id
+        ) {
+          payload.option = buildOptionMap(option);
+        }
+      }
       const res = await apiAddToCart(payload);
       console.log("addToCart: Server response:", res);
 
@@ -95,11 +128,11 @@ export const CartProvider = ({ children }) => {
 
       if (!isSuccess) {
         setCartItems(backupRef.current || []);
-
+        
         // Handle error - check if it's a multi-store conflict
         let message = "Could not add to cart";
         let isMultiStoreError = false;
-
+        
         if (res?.error) {
           if (Array.isArray(res.error)) {
             // Server returned error as array (e.g., ["Your cart already contains..."])
@@ -107,29 +140,24 @@ export const CartProvider = ({ children }) => {
           } else if (typeof res.error === "string") {
             message = res.error;
           }
-
+          
           // Check if this is a multi-store conflict
-          if (
-            message.toLowerCase().includes("cart already contains") ||
-            message.toLowerCase().includes("different store")
-          ) {
+          if (message.toLowerCase().includes("cart already contains") || 
+              message.toLowerCase().includes("different store")) {
             isMultiStoreError = true;
           }
         } else if (res?.message) {
           message = res.message;
         }
-
-        console.log(
-          "addToCart: Error type:",
-          isMultiStoreError ? "Multi-store conflict" : "General error"
-        );
-
+        
+        console.log("addToCart: Error type:", isMultiStoreError ? "Multi-store conflict" : "General error");
+        
         // If it's a multi-store error, show confirmation dialog
         if (isMultiStoreError) {
           const confirmClear = window.confirm(
             `${message}\n\nWould you like to clear your current cart and add this item?`
           );
-
+          
           if (confirmClear) {
             console.log("User confirmed: Clearing cart and adding new item");
             // Clear the cart first, then add the new item
@@ -137,10 +165,7 @@ export const CartProvider = ({ children }) => {
               await clearCart();
               // Try adding again after clearing
               const retryRes = await apiAddToCart(payload);
-              if (
-                retryRes &&
-                (retryRes.success === 1 || retryRes.success === true)
-              ) {
+              if (retryRes && (retryRes.success === 1 || retryRes.success === true)) {
                 toast.success("Cart cleared and item added!");
                 // Update local state with new item
                 setCartItems([{ product, storeId, quantity }]);
@@ -156,7 +181,7 @@ export const CartProvider = ({ children }) => {
             }
           } else {
             console.log("User cancelled: Keeping existing cart");
-            toast("Item not added. Current cart unchanged.", { icon: "ℹ️" });
+            toast("Item not added. Current cart unchanged.", { icon: 'ℹ️' });
             return { success: false, cancelled: true };
           }
         } else {
@@ -234,7 +259,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const updateQuantity = async (productId, storeId, quantity) => {
+  const updateQuantity = async (productId, storeId, quantity, option) => {
     if (quantity <= 0) {
       removeFromCart(productId, storeId);
       return;
@@ -242,9 +267,17 @@ export const CartProvider = ({ children }) => {
 
     // Optimistically update local state
     const backup = cartItems;
+    const sameOptionLocal = (a, b) => {
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      return (
+        String(a.product_option_id) === String(b.product_option_id) &&
+        String(a.product_option_value_id) === String(b.product_option_value_id)
+      );
+    };
     setCartItems((prevItems) =>
       prevItems.map((item) =>
-        item.product.id === productId && item.storeId === storeId
+        item.product.id === productId && item.storeId === storeId && sameOptionLocal(item.option, option)
           ? { ...item, quantity }
           : item
       )
