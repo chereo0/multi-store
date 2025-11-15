@@ -519,6 +519,239 @@ export const getProduct = async (productId) => {
   return { success: !!product, data: normalizeProduct(product) };
 };
 
+// Search stores by name/description/slug; tries backend then falls back to client filtering
+export const searchStores = async (query) => {
+  const q = String(query || '').trim();
+  if (!q) return { success: true, data: [] };
+  try {
+    // Try a few common endpoints
+    const endpoints = [
+      `/stores?search=${encodeURIComponent(q)}`,
+      `/search/stores?q=${encodeURIComponent(q)}`,
+      `/search?q=${encodeURIComponent(q)}&type=stores`,
+    ];
+    for (const path of endpoints) {
+      try {
+        const res = await api.get(path);
+        const body = res?.data || {};
+        const list = body.data || body.stores || body.items || body;
+        if (Array.isArray(list) && list.length >= 0) {
+          return { success: true, data: list };
+        }
+      } catch (_e) {}
+    }
+  } catch (_err) {}
+  // Fallback: use home page builder and filter client-side
+  try {
+    const home = await getHomePageBuilder();
+    let arr = [];
+    if (home?.success) {
+      const d = home.data;
+      if (Array.isArray(d)) {
+        const widget = d.find((w) => Array.isArray(w.stores) || Array.isArray(w.items));
+        arr = (widget?.stores || widget?.items || []).slice(0, 100);
+      } else if (Array.isArray(d?.stores)) {
+        arr = d.stores.slice(0, 100);
+      }
+      const low = q.toLowerCase();
+      const filtered = arr.filter((s) => {
+        const name = (s?.name || '').toLowerCase();
+        const desc = (s?.description || '').toLowerCase();
+        const slug = (s?.slug || '').toLowerCase();
+        return name.includes(low) || desc.includes(low) || slug.includes(low);
+      });
+      return { success: true, data: filtered };
+    }
+  } catch (_err2) {}
+  return { success: true, data: [] };
+};
+
+// Search products; tries backend endpoints, falls back to scanning products from first N stores
+export const searchProducts = async (query) => {
+  const q = String(query || '').trim();
+  if (!q) return { success: true, data: [] };
+  try {
+    const endpoints = [
+      `/search/products?q=${encodeURIComponent(q)}`,
+      `/products?search=${encodeURIComponent(q)}`,
+      `/search?q=${encodeURIComponent(q)}&type=products`,
+    ];
+    for (const path of endpoints) {
+      try {
+        const res = await api.get(path);
+        const body = res?.data || {};
+        const raw = body.data || body.products || body.items || body;
+        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : [];
+        if (Array.isArray(list)) {
+          const normalized = list.map((p) => normalizeProduct(p));
+          return { success: true, data: normalized };
+        }
+      } catch (_e) {}
+    }
+  } catch (_err) {}
+  // Fallback: fetch stores from home builder and query first few products
+  try {
+    const storesRes = await getHomePageBuilder();
+    let storeList = [];
+    const d = storesRes?.data;
+    if (Array.isArray(d)) {
+      const widget = d.find((w) => Array.isArray(w.stores) || Array.isArray(w.items));
+      storeList = (widget?.stores || widget?.items || []).slice(0, 10);
+    } else if (Array.isArray(d?.stores)) {
+      storeList = d.stores.slice(0, 10);
+    }
+    const low = q.toLowerCase();
+    const results = [];
+    for (const s of storeList) {
+      const storeId = s.id || s.store_id || s.storeId || s.slug;
+      if (!storeId) continue;
+      try {
+        const prods = await getProducts(storeId);
+        if (prods?.success) {
+          for (const prod of prods.data || []) {
+            const name = (prod?.name || '').toLowerCase();
+            const model = (prod?.model || '').toLowerCase();
+            if (name.includes(low) || model.includes(low)) {
+              results.push({ ...prod, storeId: prod.storeId || storeId, storeName: s.name });
+            }
+          }
+        }
+      } catch (_e) {}
+    }
+    return { success: true, data: results };
+  } catch (_err2) {
+    return { success: true, data: [] };
+  }
+};
+
+// Lightweight client-side suggestions for products and stores without backend endpoints
+// Caches home builder and per-store products in-memory to keep typing responsive
+const __searchCache = {
+  homeAt: 0,
+  home: null,
+  productsByStore: {},
+};
+
+const getHomeCached = async () => {
+  const now = Date.now();
+  // refresh cache every 5 minutes
+  if (!__searchCache.home || now - __searchCache.homeAt > 5 * 60 * 1000) {
+    try {
+      const res = await getHomePageBuilder();
+      if (res?.success) {
+        __searchCache.home = res.data;
+        __searchCache.homeAt = now;
+      }
+    } catch (_) {}
+  }
+  return __searchCache.home;
+};
+
+const getStoreListFromHome = (home) => {
+  if (!home) return [];
+  // Home can be array of widgets or object with stores
+  if (Array.isArray(home)) {
+    const stores = [];
+    for (const w of home) {
+      if (Array.isArray(w?.stores)) stores.push(...w.stores);
+      if (Array.isArray(w?.items)) stores.push(...w.items);
+    }
+    return stores;
+  }
+  if (Array.isArray(home?.stores)) return home.stores;
+  return [];
+};
+
+const scoreIncludes = (text, tokens) => {
+  const t = (text || '').toString().toLowerCase();
+  let score = 0;
+  for (const tok of tokens) {
+    if (!tok) continue;
+    const idx = t.indexOf(tok);
+    if (idx >= 0) {
+      // earlier matches score slightly higher
+      score += 2 + Math.max(0, 5 - idx);
+    }
+  }
+  return score;
+};
+
+export const searchSuggest = async (query, options = {}) => {
+  const q = String(query || '').trim();
+  const limitStores = options.limitStores || 8;
+  const limitProducts = options.limitProducts || 8;
+  if (q.length < 2) return { success: true, data: { products: [], stores: [] } };
+
+  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+
+  // 1) Get stores from home builder and filter
+  const home = await getHomeCached();
+  let stores = getStoreListFromHome(home).map((s) => ({
+    id: s.id || s.store_id || s.storeId || s.slug,
+    name: s.name || s.store_name || '',
+    description: s.description || s.desc || '',
+    logo: s.logo || s.profile_image,
+    raw: s,
+  }));
+  const scoredStores = stores
+    .map((s) => ({
+      ...s,
+      _score: scoreIncludes(`${s.name} ${s.description}`, tokens),
+    }))
+    .filter((s) => s._score > 0)
+    .sort((a, b) => b._score - a._score)
+    .slice(0, limitStores);
+
+  // 2) Gather products: use cached per-store products; fetch for top few stores if not cached
+  const products = [];
+  const candidateStores = scoredStores.length > 0 ? scoredStores : stores.slice(0, 10);
+
+  for (const s of candidateStores.slice(0, 6)) {
+    const sid = s.id;
+    if (!sid) continue;
+    if (!__searchCache.productsByStore[sid]) {
+      try {
+        const res = await getProducts(sid);
+        if (res?.success) {
+          __searchCache.productsByStore[sid] = res.data || [];
+        } else {
+          __searchCache.productsByStore[sid] = [];
+        }
+      } catch (_) {
+        __searchCache.productsByStore[sid] = [];
+      }
+    }
+    for (const p of __searchCache.productsByStore[sid]) {
+      const name = p?.name || p?.raw?.name || '';
+      const model = p?.model || '';
+      const desc = p?.description || '';
+      const score = scoreIncludes(`${name} ${model} ${desc}`, tokens);
+      if (score > 0) {
+        products.push({ ...p, storeId: p.storeId || sid, _score: score });
+      }
+    }
+  }
+
+  const topProducts = products
+    .sort((a, b) => b._score - a._score)
+    .slice(0, limitProducts)
+    .map((p) => ({
+      id: p.id || p.product_id,
+      name: p.name,
+      image: p.image || p.images?.[0] || p.raw?.image,
+      priceDisplay: p.priceDisplay || p.price_formated || (p.price ? `$${(+p.price).toFixed(2)}` : ''),
+      storeId: p.storeId,
+    }));
+
+  const topStores = scoredStores.map((s) => ({
+    id: s.id,
+    name: s.name,
+    logo: s.logo,
+  }));
+
+  return { success: true, data: { products: topProducts, stores: topStores } };
+};
+
 export const getStoreReviews = async (storeId) => {
   // Some backends do not expose a GET /store/:id/reviews endpoint (405)
   // and/or block cross-origin requests. To avoid noisy errors in the

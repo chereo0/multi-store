@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
 import ThemeToggle from "./ThemeToggle";
+import { searchSuggest } from "../api/services";
 import {
   MagnifyingGlassIcon,
   ShoppingCartIcon,
@@ -22,6 +23,9 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState({ products: [], stores: [] });
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   // Consider authenticated only when a real user (not guest) and a token exist
   const isAuthenticated = !!(
@@ -56,8 +60,48 @@ const Navbar = () => {
   const onSearchSubmit = (e) => {
     e.preventDefault();
     const q = (searchQuery || "").trim();
-    navigate(`/stores?q=${encodeURIComponent(q)}`);
+    navigate(`/search?q=${encodeURIComponent(q)}`);
     setIsMobileMenuOpen(false);
+    setShowSuggestions(false);
+  };
+
+  // Debounced live suggestions while typing
+  useEffect(() => {
+    let t;
+    const run = async () => {
+      const q = (searchQuery || '').trim();
+      if (q.length < 2) {
+        setSuggestions({ products: [], stores: [] });
+        setShowSuggestions(false);
+        return;
+      }
+      setSuggestLoading(true);
+      try {
+        const res = await searchSuggest(q, { limitProducts: 6, limitStores: 6 });
+        const data = res?.data || { products: [], stores: [] };
+        setSuggestions({
+          products: Array.isArray(data.products) ? data.products : [],
+          stores: Array.isArray(data.stores) ? data.stores : [],
+        });
+        setShowSuggestions(true);
+      } catch (_) {
+        setSuggestions({ products: [], stores: [] });
+        setShowSuggestions(false);
+      } finally {
+        setSuggestLoading(false);
+      }
+    };
+    t = setTimeout(run, 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const onClickSuggestion = (item, type) => {
+    setShowSuggestions(false);
+    if (type === 'product') {
+      navigate(`/product/${item.id}`, { state: { storeId: item.storeId } });
+    } else if (type === 'store') {
+      navigate(`/store/${item.id}`);
+    }
   };
 
   return (
@@ -116,7 +160,7 @@ const Navbar = () => {
             {/* Search bar (desktop) */}
             <form onSubmit={onSearchSubmit} role="search" aria-label="Site search" className="ml-3">
               <div
-                className={`flex items-center h-10 rounded-full px-3 border focus-within:ring-2 transition shadow-sm ${
+                className={`relative flex items-center h-10 rounded-full px-3 border focus-within:ring-2 transition shadow-sm ${
                   isDarkMode
                     ? "bg-gray-800/70 border-gray-700 focus-within:ring-cyan-500/40"
                     : "bg-white/90 border-gray-300 focus-within:ring-cyan-500/30"
@@ -127,11 +171,19 @@ const Navbar = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search stores..."
+                  placeholder="Search products or stores..."
                   className={`w-48 lg:w-64 bg-transparent outline-none text-sm leading-none ${
                     isDarkMode ? "text-gray-200 placeholder-gray-400" : "text-gray-800 placeholder-gray-500"
                   }`}
-                  aria-label="Search stores"
+                  aria-label="Search products or stores"
+                  onFocus={() => {
+                    if ((searchQuery || '').trim().length >= 2 && (suggestions.products.length || suggestions.stores.length)) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowSuggestions(false), 150);
+                  }}
                 />
                 {searchQuery && (
                   <button
@@ -159,6 +211,54 @@ const Navbar = () => {
                 >
                   <MagnifyingGlassIcon className="w-5 h-5" />
                 </button>
+
+                {showSuggestions && (suggestions.products.length > 0 || suggestions.stores.length > 0 || suggestLoading) && (
+                  <div className={`absolute top-11 left-0 w-[28rem] max-w-[80vw] z-50 rounded-xl border shadow-lg ${
+                    isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+                  }`}>
+                    <div className="p-3">
+                      {suggestLoading && (
+                        <div className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'} text-sm px-1 py-1`}>Searching…</div>
+                      )}
+                      {suggestions.products.length > 0 && (
+                        <div>
+                          <div className={`text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Products</div>
+                          <ul>
+                            {suggestions.products.slice(0,6).map((p) => (
+                              <li key={`p-${p.id}`} className={`flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onClickSuggestion(p, 'product')}>
+                                <img src={p.image || '/no-image.png'} alt={p.name} className="w-8 h-8 rounded object-cover bg-gray-100" />
+                                <div className="min-w-0">
+                                  <div className={`truncate text-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>{p.name}</div>
+                                  {p.priceDisplay && <div className={`text-xs ${isDarkMode ? 'text-cyan-300' : 'text-cyan-700'}`}>{p.priceDisplay}</div>}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {suggestions.stores.length > 0 && (
+                        <div className="mt-2">
+                          <div className={`text-xs font-semibold mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Stores</div>
+                          <ul>
+                            {suggestions.stores.slice(0,6).map((s) => (
+                              <li key={`s-${s.id}`} className={`flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onClickSuggestion(s, 'store')}>
+                                <img src={s.logo || '/no-image.png'} alt={s.name} className="w-8 h-8 rounded object-cover bg-gray-100" />
+                                <div className={`truncate text-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>{s.name}</div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {(suggestions.products.length > 0 || suggestions.stores.length > 0) && (
+                        <div className="pt-2">
+                          <button type="button" className={`w-full text-xs px-2 py-1 rounded ${isDarkMode ? 'text-cyan-300 hover:bg-gray-800' : 'text-cyan-700 hover:bg-gray-50'}`} onMouseDown={(e) => e.preventDefault()} onClick={() => { setShowSuggestions(false); navigate(`/search?q=${encodeURIComponent((searchQuery||'').trim())}`); }}>
+                            View all results
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           </div>

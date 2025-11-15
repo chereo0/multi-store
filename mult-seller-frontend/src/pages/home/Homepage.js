@@ -31,6 +31,8 @@ const Homepage = () => {
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
+  const [slideImages, setSlideImages] = useState([]);
+  const [slidesReady, setSlidesReady] = useState(false);
   const { user } = useAuth();
   // const { getCartItemsCount } = useCart();
   const { isDarkMode, colors } = useTheme();
@@ -118,6 +120,75 @@ const Homepage = () => {
     fetchStores();
   }, []);
 
+  // Resolve slideshow images from optional manifest or common name patterns
+  useEffect(() => {
+    let cancelled = false;
+    const base = process.env.PUBLIC_URL || "";
+    const names = [
+      // preferred
+      "sd1", "sd2", "sd3", "sd4", "sd5", "sd6", "sd7", "sd8",
+      // common alternates
+      "slide1", "slide2", "slide3", "slide4",
+      "hero-1", "hero-2", "hero-3", "hero-4",
+      "banner-1", "banner-2", "banner-3", "banner-4",
+      "sd_1", "sd_2", "sd_3", "sd_4",
+    ];
+    const exts = [".jpg", ".jpeg", ".png", ".webp", ".JPG", ".PNG"]; // try common cases
+
+    const probe = (url) =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(url);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+
+    const resolveOne = async (name) => {
+      for (const ext of exts) {
+        const url = `${base}/slideshow/${name}${ext}`;
+        const ok = await probe(url);
+        if (ok) return ok;
+      }
+      return null;
+    };
+
+    (async () => {
+      // First try optional manifest: /slideshow/index.json with ["file1.jpg", ...]
+      let listed = [];
+      try {
+        const res = await fetch(`${base}/slideshow/index.json`, { cache: 'no-store' });
+        if (res.ok) {
+          const arr = await res.json();
+          if (Array.isArray(arr)) {
+            for (const entry of arr) {
+              if (typeof entry === 'string' && entry.trim()) {
+                const url = `${base}/slideshow/${entry.trim()}`;
+                const ok = await probe(url);
+                if (ok) listed.push(ok);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      const found = [...listed];
+      if (found.length === 0) {
+        for (const n of names) {
+          const url = await resolveOne(n);
+          if (url) found.push(url);
+        }
+      }
+      if (!cancelled) {
+        setSlideImages(found);
+        setSlidesReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const navigate = useNavigate();
 
   if (loading) {
@@ -160,23 +231,24 @@ const Homepage = () => {
         className={`relative overflow-hidden w-full`}
         style={{}}
       >
-        {/* Build slideshow images from banners or fallback images */}
+        {/* Build slideshow images from sd1..sd4 in public/slideshow (any common image extension) */}
         <div className="w-full relative z-10">
           {(() => {
-            const heroImages = Array.isArray(banners)
-              ? banners
-                  .map((b) =>
-                    b?.image || b?.banner || b?.url || b?.src || b?.background_image
-                  )
-                  .filter(Boolean)
-              : [];
-            const fallback = [
-              "/landing-bg.jpg",
-              "/Gemini_Generated_Image_enzgvmenzgvmenzg.png",
-              "/Gemini_Generated_Image_pc6crxpc6crxpc6c.png",
-            ];
-            const slides = heroImages.length ? heroImages : fallback;
-            return <HeroSlideshow images={slides} height="100vh" />;
+            const slides = slideImages && slideImages.length > 0 ? slideImages : [];
+            if (slides.length > 0) {
+              return <HeroSlideshow images={slides} height="100vh" />;
+            }
+            // Friendly empty state if no images found in slideshow folder
+            return (
+              <div className="w-full h-[70vh] flex items-center justify-center text-center">
+                <div>
+                  <div className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-2">No slideshow images found</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Add files named <code>sd1..sd4</code> (or provide <code>slideshow/index.json</code>) under <code>public/slideshow</code> and refresh.
+                  </div>
+                </div>
+              </div>
+            );
           })()}
         </div>
 
@@ -224,7 +296,7 @@ const Homepage = () => {
             {/* CTA Button */}
             <div className="mb-16">
               <Link
-                to={homeData?.hero?.cta_link || "/categories"}
+                to="/stores"
                 className="inline-block px-12 py-4 rounded-full text-lg font-semibold text-white transition-all duration-300 hover:scale-105 transform"
                 style={{
                   background: "linear-gradient(90deg, #00E5FF, #FF00FF)",
@@ -1511,13 +1583,14 @@ const Homepage = () => {
                   </button>
                 </li>
                 <li>
-                  <button
+                  <Link
+                    to="/services"
                     className={`hover:text-[#00E5FF] transition-colors duration-200 ${
                       colors[isDarkMode ? "dark" : "light"].textSecondary
                     }`}
                   >
                     Services
-                  </button>
+                  </Link>
                 </li>
                 <li>
                   <button
